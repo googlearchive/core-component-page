@@ -2,7 +2,8 @@
   "name": "polymer-home-page",
   "private": true,
   "dependencies": {
-    "polymer": "Polymer/polymer#master",
-    "polymer-ui-action-icons": "Polymer/polymer-ui-action-icons#master"
-  }
+    "polymer": "Polymer/polymer#0.2.1",
+    "polymer-ui-action-icons": "Polymer/polymer-ui-action-icons#0.2.1"
+  },
+  "version": "0.2.1"
 }
