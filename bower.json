@@ -1,8 +1,8 @@
 {
-  "name": "polymer-home-page",
+  "name": "core-component-page",
   "private": true,
   "dependencies": {
     "polymer": "Polymer/polymer#master",
-    "polymer-ui-action-icons": "Polymer/polymer-ui-action-icons#master"
+    "core-action-icons": "Polymer/core-action-icons#master"
   }
 }
