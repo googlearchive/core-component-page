@@ -2,7 +2,7 @@
   "name": "core-component-page",
   "private": true,
   "dependencies": {
-    "polymer": "Polymer/polymer#master",
+    "platform": "Polymer/platform#master",
     "core-action-icons": "Polymer/core-action-icons#master"
   }
 }
