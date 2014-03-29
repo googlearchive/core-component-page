@@ -1,3 +1,2477 @@
+<!--
+Copyright 2014 The Polymer Authors. All rights reserved.
+Use of this source code is governed by a BSD-style
+license that can be found in the LICENSE file.
+-->
+<!--
+/**
+ * @module Polymer
+ */
+/**
+ * The `polymer-body` element extends the body element. It provides a quick and 
+ * easy way to do data binding without the need to setup a custom element 
+ * or template. The body itself serves as the model and controller for the 
+ * elements it contains. Both data and event handlers can be bound. 
+ *
+ * The `polymer-body` element does not create any ShadowDOM. Instead, 
+ * it creates elements in the main document. This makes it convenient to use 
+ * when it's important that elements are not placed inside ShadowDOM.
+ *
+ * The `polymer-body` element provides a subset of the capability you 
+ * get when you define a custom element. When you put data and event listeners
+ * on `polymer-body`, you're customizing an instance of the element.
+ * Because of this you cannot define lifecycle methods like ready. If you need
+ * to do this, make a custom element.
+ * 
+ * Example:
+ *
+ *     <body is="polymer-body">
+ *       <template>
+ *         {{greeting}}
+ *         <button on-tap="buttonTap">Tap me!</button>
+ *       </template>
+ *       <script>
+ *         model.greeting = 'Hello!';
+ *         model.buttonTap = function() {
+ *           console.log('tap!');
+ *         };
+ *       </script>
+ *     </body>
+ *
+ * @status stable
+-->
+<polymer-element name="polymer-body" extends="body" attributes="modelName" assetpath="../polymer-dev/src/">
+
+  <script>
+    
+    /*
+      Normally, it would be required to load polymer-body last to ensure 
+      its contained elements bind properly. However, for convenience, we load
+      `polymer-body` with polymer and register it at `polymer-ready` time.
+      This means that `polymer-body` is ready asynchronous to the 
+      `polymer-ready` event.
+    */
+    // upgrade polymer-body last so that 
+    // 1. it can contain other imported elements without needing to come last
+    // 2. scripts that customize the model are not required to be before
+    // polymer-body is loaded (note: native imports block scripts).
+    document.addEventListener('polymer-ready', function() {
+
+      Polymer('polymer-body', {
+
+        modelName: 'model',
+
+        ready: function() {
+          this.template = document.querySelector('template');
+          var model = window[this.modelName];
+          if (model) {
+            Platform.mixin(this, model);
+          }
+          if (this.template) {
+            this.lightFromTemplate(this.template,
+                this.template.nextElementSibling);
+          }
+        }
+
+      });
+
+    });
+
+  </script>
+
+</polymer-element>
+<!--
+ Copyright 2013 The Polymer Authors. All rights reserved.
+ Use of this source code is governed by a BSD-style
+ license that can be found in the LICENSE file.
+-->
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+Polymer = {};
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+
+// TODO(sorvell): this ensures Polymer is an object and not a function
+// Platform is currently defining it as a function to allow for async loading
+// of polymer; once we refine the loading process this likely goes away.
+if (typeof window.Polymer === 'function') {
+  Polymer = {};
+}
+
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  // copy own properties from 'api' to 'prototype, with name hinting for 'super'
+  function extend(prototype, api) {
+    if (prototype && api) {
+      // use only own properties of 'api'
+      Object.getOwnPropertyNames(api).forEach(function(n) {
+        // acquire property descriptor
+        var pd = Object.getOwnPropertyDescriptor(api, n);
+        if (pd) {
+          // clone property via descriptor
+          Object.defineProperty(prototype, n, pd);
+          // cache name-of-method for 'super' engine
+          if (typeof pd.value == 'function') {
+            // hint the 'super' engine
+            pd.value.nom = n;
+          }
+        }
+      });
+    }
+    return prototype;
+  }
+  
+  // exports
+
+  scope.extend = extend;
+
+})(Polymer);
+</script>
+<script>/* 
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+
+(function(scope) {
+  
+  // usage
+  
+  // invoke cb.call(this) in 100ms, unless the job is re-registered,
+  // which resets the timer
+  // 
+  // this.myJob = this.job(this.myJob, cb, 100)
+  //
+  // returns a job handle which can be used to re-register a job
+
+  var Job = function(inContext) {
+    this.context = inContext;
+    this.boundComplete = this.complete.bind(this)
+  };
+  Job.prototype = {
+    go: function(callback, wait) {
+      this.callback = callback;
+      var h;
+      if (!wait) {
+        h = requestAnimationFrame(this.boundComplete);
+        this.handle = function() {
+          cancelAnimationFrame(h);
+        }
+      } else {
+        h = setTimeout(this.boundComplete, wait);
+        this.handle = function() {
+          clearTimeout(h);
+        }
+      }
+    },
+    stop: function() {
+      if (this.handle) {
+        this.handle();
+        this.handle = null;
+      }
+    },
+    complete: function() {
+      if (this.handle) {
+        this.stop();
+        this.callback.call(this.context);
+      }
+    }
+  };
+  
+  function job(job, callback, wait) {
+    if (job) {
+      job.stop();
+    } else {
+      job = new Job(this);
+    }
+    job.go(callback, wait);
+    return job;
+  }
+  
+  // exports 
+
+  scope.job = job;
+  
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  var registry = {};
+
+  HTMLElement.register = function(tag, prototype) {
+    registry[tag] = prototype;
+  }
+
+  // get prototype mapped to node <tag>
+  HTMLElement.getPrototypeForTag = function(tag) {
+    var prototype = !tag ? HTMLElement.prototype : registry[tag];
+    // TODO(sjmiles): creating <tag> is likely to have wasteful side-effects
+    return prototype || Object.getPrototypeOf(document.createElement(tag));
+  };
+
+  // we have to flag propagation stoppage for the event dispatcher
+  var originalStopPropagation = Event.prototype.stopPropagation;
+  Event.prototype.stopPropagation = function() {
+    this.cancelBubble = true;
+    originalStopPropagation.apply(this, arguments);
+  };
+  
+  // TODO(sorvell): remove when we're sure imports does not need
+  // to load stylesheets
+  /*
+  HTMLImports.importer.preloadSelectors += 
+      ', polymer-element link[rel=stylesheet]';
+  */
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+ (function(scope) {
+    // super
+
+    // `arrayOfArgs` is an optional array of args like one might pass
+    // to `Function.apply`
+
+    // TODO(sjmiles):
+    //    $super must be installed on an instance or prototype chain
+    //    as `super`, and invoked via `this`, e.g.
+    //      `this.super();`
+
+    //    will not work if function objects are not unique, for example,
+    //    when using mixins.
+    //    The memoization strategy assumes each function exists on only one 
+    //    prototype chain i.e. we use the function object for memoizing)
+    //    perhaps we can bookkeep on the prototype itself instead
+    function $super(arrayOfArgs) {
+      // since we are thunking a method call, performance is important here: 
+      // memoize all lookups, once memoized the fast path calls no other 
+      // functions
+      //
+      // find the caller (cannot be `strict` because of 'caller')
+      var caller = $super.caller;
+      // memoized 'name of method' 
+      var nom = caller.nom;
+      // memoized next implementation prototype
+      var _super = caller._super;
+      if (!_super) {
+        if (!nom) {
+          nom = caller.nom = nameInThis.call(this, caller);
+        }
+        if (!nom) {
+          console.warn('called super() on a method not installed declaratively (has no .nom property)');
+        }
+        // super prototype is either cached or we have to find it
+        // by searching __proto__ (at the 'top')
+        _super = memoizeSuper(caller, nom, getPrototypeOf(this));
+      }
+      if (!_super) {
+        // if _super is falsey, there is no super implementation
+        //console.warn('called $super(' + nom + ') where there is no super implementation');
+      } else {
+        // our super function
+        var fn = _super[nom];
+        // memoize information so 'fn' can call 'super'
+        if (!fn._super) {
+          memoizeSuper(fn, nom, _super);
+        }
+        // invoke the inherited method
+        // if 'fn' is not function valued, this will throw
+        return fn.apply(this, arrayOfArgs || []);
+      }
+    }
+
+    function nextSuper(proto, name, caller) {
+      // look for an inherited prototype that implements name
+      while (proto) {
+        if ((proto[name] !== caller) && proto[name]) {
+          return proto;
+        }
+        proto = getPrototypeOf(proto);
+      }
+    }
+
+    function memoizeSuper(method, name, proto) {
+      // find and cache next prototype containing `name`
+      // we need the prototype so we can do another lookup
+      // from here
+      method._super = nextSuper(proto, name, method);
+      if (method._super) {
+        // _super is a prototype, the actual method is _super[name]
+        // tag super method with it's name for further lookups
+        method._super[name].nom = name;
+      }
+      return method._super;
+    }
+
+    function nameInThis(value) {
+      var p = this.__proto__;
+      while (p && p !== HTMLElement.prototype) {
+        // TODO(sjmiles): getOwnPropertyNames is absurdly expensive
+        var n$ = Object.getOwnPropertyNames(p);
+        for (var i=0, l=n$.length, n; i<l && (n=n$[i]); i++) {
+          var d = Object.getOwnPropertyDescriptor(p, n);
+          if (typeof d.value === 'function' && d.value === value) {
+            return n;
+          }
+        }
+        p = p.__proto__;
+      }
+    }
+
+    // NOTE: In some platforms (IE10) the prototype chain is faked via 
+    // __proto__. Therefore, always get prototype via __proto__ instead of
+    // the more standard Object.getPrototypeOf.
+    function getPrototypeOf(prototype) {
+      return prototype.__proto__;
+    }
+
+    // utility function to precompute name tags for functions
+    // in a (unchained) prototype
+    function hintSuper(prototype) {
+      // tag functions with their prototype name to optimize
+      // super call invocations
+      for (var n in prototype) {
+        var pd = Object.getOwnPropertyDescriptor(prototype, n);
+        if (pd && typeof pd.value === 'function') {
+          pd.value.nom = n;
+        }
+      }
+    }
+
+    // exports
+
+    scope.super = $super;
+
+})(Polymer);
+</script>
+<script>/* 
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+
+(function(scope) {
+
+  var typeHandlers = {
+    string: function(value) {
+      return value;
+    },
+    date: function(value) {
+      return new Date(Date.parse(value) || Date.now());
+    },
+    boolean: function(value) {
+      if (value === '') {
+        return true;
+      }
+      return value === 'false' ? false : !!value;
+    },
+    number: function(value) {
+      var n = parseFloat(value);
+      // hex values like "0xFFFF" parseFloat as 0
+      if (n === 0) {
+        n = parseInt(value);
+      }
+      return isNaN(n) ? value : n;
+      // this code disabled because encoded values (like "0xFFFF")
+      // do not round trip to their original format
+      //return (String(floatVal) === value) ? floatVal : value;
+    },
+    object: function(value, currentValue) {
+      if (currentValue === null) {
+        return value;
+      }
+      try {
+        // If the string is an object, we can parse is with the JSON library.
+        // include convenience replace for single-quotes. If the author omits
+        // quotes altogether, parse will fail.
+        return JSON.parse(value.replace(/'/g, '"'));
+      } catch(e) {
+        // The object isn't valid JSON, return the raw value
+        return value;
+      }
+    },
+    // avoid deserialization of functions
+    'function': function(value, currentValue) {
+      return currentValue;
+    }
+  };
+
+  function deserializeValue(value, currentValue) {
+    // attempt to infer type from default value
+    var inferredType = typeof currentValue;
+    // invent 'date' type value for Date
+    if (currentValue instanceof Date) {
+      inferredType = 'date';
+    }
+    // delegate deserialization via type string
+    return typeHandlers[inferredType](value, currentValue);
+  }
+
+  // exports
+
+  scope.deserializeValue = deserializeValue;
+
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  // imports
+
+  var extend = scope.extend;
+
+  // module
+
+  var api = {};
+
+  api.declaration = {};
+  api.instance = {};
+
+  api.publish = function(apis, prototype) {
+    for (var n in apis) {
+      extend(prototype, apis[n]);
+    }
+  }
+
+  // exports
+
+  scope.api = api;
+
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  var utils = {
+    /**
+      * Invokes a function asynchronously. The context of the callback
+      * function is bound to 'this' automatically.
+      * @method async
+      * @param {Function|String} method
+      * @param {any|Array} args
+      * @param {number} timeout
+      */
+    async: function(method, args, timeout) {
+      // when polyfilling Object.observe, ensure changes 
+      // propagate before executing the async method
+      Platform.flush();
+      // second argument to `apply` must be an array
+      args = (args && args.length) ? args : [args];
+      // function to invoke
+      var fn = function() {
+        (this[method] || method).apply(this, args);
+      }.bind(this);
+      // execute `fn` sooner or later
+      var handle = timeout ? setTimeout(fn, timeout) :
+          requestAnimationFrame(fn);
+      // NOTE: switch on inverting handle to determine which time is used.
+      return timeout ? handle : ~handle;
+    },
+    cancelAsync: function(handle) {
+      if (handle < 0) {
+        cancelAnimationFrame(~handle);
+      } else {
+        clearTimeout(handle);
+      }
+    },
+    /**
+      * Fire an event.
+      * @method fire
+      * @returns {Object} event
+      * @param {string} type An event name.
+      * @param {any} detail
+      * @param {Node} onNode Target node.
+      */
+    fire: function(type, detail, onNode, bubbles, cancelable) {
+      var node = onNode || this;
+      var detail = detail || {};
+      var event = new CustomEvent(type, {
+        bubbles: (bubbles !== undefined ? bubbles : true), 
+        cancelable: (cancelable !== undefined ? cancelable : true), 
+        detail: detail
+      });
+      node.dispatchEvent(event);
+      return event;
+    },
+    /**
+      * Fire an event asynchronously.
+      * @method asyncFire
+      * @param {string} type An event name.
+      * @param detail
+      * @param {Node} toNode Target node.
+      */
+    asyncFire: function(/*inType, inDetail*/) {
+      this.async("fire", arguments);
+    },
+    /**
+      * Remove class from old, add class to anew, if they exist
+      * @param classFollows
+      * @param anew A node.
+      * @param old A node
+      * @param className
+      */
+    classFollows: function(anew, old, className) {
+      if (old) {
+        old.classList.remove(className);
+      }
+      if (anew) {
+        anew.classList.add(className);
+      }
+    }
+  };
+
+  // no-operation function for handy stubs
+  var nop = function() {};
+
+  // null-object for handy stubs
+  var nob = {};
+
+  // deprecated
+
+  utils.asyncMethod = utils.async;
+
+  // exports
+
+  scope.api.instance.utils = utils;
+  scope.nop = nop;
+  scope.nob = nob;
+
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+
+(function(scope) {
+
+  // imports
+
+  var log = window.logFlags || {};
+  var EVENT_PREFIX = 'on-';
+
+  // instance events api
+  var events = {
+    // read-only
+    EVENT_PREFIX: EVENT_PREFIX,
+    // event listeners on host
+    addHostListeners: function() {
+      var events = this.eventDelegates;
+      log.events && (Object.keys(events).length > 0) && console.log('[%s] addHostListeners:', this.localName, events);
+      // NOTE: host events look like bindings but really are not;
+      // (1) we don't want the attribute to be set and (2) we want to support
+      // multiple event listeners ('host' and 'instance') and Node.bind
+      // by default supports 1 thing being bound.
+      // We do, however, leverage the event hookup code in PolymerExpressions
+      // so that we have a common code path for handling declarative events.
+      var self = this, bindable, eventName;
+      for (var n in events) {
+        eventName = EVENT_PREFIX + n;
+        bindable = PolymerExpressions.prepareEventBinding(
+          Path.get(events[n]),
+          eventName, 
+          {
+            resolveEventHandler: function(model, path, node) {
+              var fn = path.getValueFrom(self);
+              if (fn) {
+                return fn.bind(self);
+              }
+            }
+          }
+        );
+        bindable(this, this, false);
+      }
+    },
+    // call 'method' or function method on 'obj' with 'args', if the method exists
+    dispatchMethod: function(obj, method, args) {
+      if (obj) {
+        log.events && console.group('[%s] dispatch [%s]', obj.localName, method);
+        var fn = typeof method === 'function' ? method : obj[method];
+        if (fn) {
+          fn[args ? 'apply' : 'call'](obj, args);
+        }
+        log.events && console.groupEnd();
+        Platform.flush();
+      }
+    }
+  };
+
+  // exports
+
+  scope.api.instance.events = events;
+
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  // instance api for attributes
+
+  var attributes = {
+    copyInstanceAttributes: function () {
+      var a$ = this._instanceAttributes;
+      for (var k in a$) {
+        if (!this.hasAttribute(k)) {
+          this.setAttribute(k, a$[k]);
+        }
+      }
+    },
+    // for each attribute on this, deserialize value to property as needed
+    takeAttributes: function() {
+      // if we have no publish lookup table, we have no attributes to take
+      // TODO(sjmiles): ad hoc
+      if (this._publishLC) {
+        for (var i=0, a$=this.attributes, l=a$.length, a; (a=a$[i]) && i<l; i++) {
+          this.attributeToProperty(a.name, a.value);
+        }
+      }
+    },
+    // if attribute 'name' is mapped to a property, deserialize
+    // 'value' into that property
+    attributeToProperty: function(name, value) {
+      // try to match this attribute to a property (attributes are
+      // all lower-case, so this is case-insensitive search)
+      var name = this.propertyForAttribute(name);
+      if (name) {
+        // filter out 'mustached' values, these are to be
+        // replaced with bound-data and are not yet values
+        // themselves
+        if (value && value.search(scope.bindPattern) >= 0) {
+          return;
+        }
+        // get original value
+        var currentValue = this[name];
+        // deserialize Boolean or Number values from attribute
+        var value = this.deserializeValue(value, currentValue);
+        // only act if the value has changed
+        if (value !== currentValue) {
+          // install new value (has side-effects)
+          this[name] = value;
+        }
+      }
+    },
+    // return the published property matching name, or undefined
+    propertyForAttribute: function(name) {
+      var match = this._publishLC && this._publishLC[name];
+      //console.log('propertyForAttribute:', name, 'matches', match);
+      return match;
+    },
+    // convert representation of 'stringValue' based on type of 'currentValue'
+    deserializeValue: function(stringValue, currentValue) {
+      return scope.deserializeValue(stringValue, currentValue);
+    },
+    serializeValue: function(value, inferredType) {
+      if (inferredType === 'boolean') {
+        return value ? '' : undefined;
+      } else if (inferredType !== 'object' && inferredType !== 'function'
+          && value !== undefined) {
+        return value;
+      }
+    },
+    reflectPropertyToAttribute: function(name) {
+      var inferredType = typeof this[name];
+      // try to intelligently serialize property value
+      var serializedValue = this.serializeValue(this[name], inferredType);
+      // boolean properties must reflect as boolean attributes
+      if (serializedValue !== undefined) {
+        this.setAttribute(name, serializedValue);
+        // TODO(sorvell): we should remove attr for all properties
+        // that have undefined serialization; however, we will need to
+        // refine the attr reflection system to achieve this; pica, for example,
+        // relies on having inferredType object properties not removed as
+        // attrs.
+      } else if (inferredType === 'boolean') {
+        this.removeAttribute(name);
+      }
+    }
+  };
+
+  // exports
+
+  scope.api.instance.attributes = attributes;
+
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  // imports
+
+  var log = window.logFlags || {};
+
+  // magic words
+
+  var OBSERVE_SUFFIX = 'Changed';
+
+  // element api
+
+  var empty = [];
+
+  var properties = {
+    observeProperties: function() {
+      var n$ = this._observeNames, pn$ = this._publishNames;
+      if ((n$ && n$.length) || (pn$ && pn$.length)) {
+        var self = this;
+        var o = this._propertyObserver = new CompoundObserver();
+        // keep track of property observer so we can shut it down
+        this.registerObservers([o]);
+        for (var i=0, l=n$.length, n; (i<l) && (n=n$[i]); i++) {
+          o.addPath(this, n);
+          // observer array properties
+          var pd = Object.getOwnPropertyDescriptor(this.__proto__, n);
+          if (pd && pd.value) {
+            this.observeArrayValue(n, pd.value, null);
+          }
+        }
+        for (var i=0, l=pn$.length, n; (i<l) && (n=pn$[i]); i++) {
+          if (!this.observe || (this.observe[n] === undefined)) {
+            o.addPath(this, n);
+          }
+        }
+        o.open(this.notifyPropertyChanges, this);
+      }
+    },
+    notifyPropertyChanges: function(newValues, oldValues, paths) {
+      var name, method, called = {};
+      for (var i in oldValues) {
+        // note: paths is of form [object, path, object, path]
+        name = paths[2 * i + 1];
+        if (this.publish[name] !== undefined) {
+          this.reflectPropertyToAttribute(name);
+        }
+        method = this.observe[name];
+        if (method) {
+          this.observeArrayValue(name, newValues[i], oldValues[i]);
+          if (!called[method]) {
+            called[method] = true;
+            // observes the value if it is an array
+            this.invokeMethod(method, [oldValues[i], newValues[i], arguments]);
+          }
+        }
+      }
+    },
+    observeArrayValue: function(name, value, old) {
+      // we only care if there are registered side-effects
+      var callbackName = this.observe[name];
+      if (callbackName) {
+        // if we are observing the previous value, stop
+        if (Array.isArray(old)) {
+          log.observe && console.log('[%s] observeArrayValue: unregister observer [%s]', this.localName, name);
+          this.closeNamedObserver(name + '__array');
+        }
+        // if the new value is an array, being observing it
+        if (Array.isArray(value)) {
+          log.observe && console.log('[%s] observeArrayValue: register observer [%s]', this.localName, name, value);
+          var observer = new ArrayObserver(value);
+          observer.open(function(value, old) {
+            this.invokeMethod(callbackName, [old]);
+          }, this);
+          this.registerNamedObserver(name + '__array', observer);
+        }
+      }
+    },
+    bindProperty: function(property, observable) {
+      // apply Polymer two-way reference binding
+      return bindProperties(this, property, observable);
+    },
+    invokeMethod: function(method, args) {
+      var fn = this[method] || method;
+      if (typeof fn === 'function') {
+        fn.apply(this, args);
+      }
+    },
+    registerObservers: function(observers) {
+      this._observers.push(observers);
+    },
+    // observer array items are arrays of observers.
+    closeObservers: function() {
+      for (var i=0, l=this._observers.length; i<l; i++) {
+        this.closeObserverArray(this._observers[i]);
+      }
+      this._observers = [];
+    },
+    closeObserverArray: function(observerArray) {
+      for (var i=0, l=observerArray.length, o; i<l; i++) {
+        o = observerArray[i];
+        if (o && o.close) {
+          o.close();
+        }
+      }
+    },
+    // bookkeeping observers for memory management
+    registerNamedObserver: function(name, observer) {
+      var o$ = this._namedObservers || (this._namedObservers = {});
+      o$[name] = observer;
+    },
+    closeNamedObserver: function(name) {
+      var o$ = this._namedObservers;
+      if (o$ && o$[name]) {
+        o$[name].close();
+        o$[name] = null;
+        return true;
+      }
+    },
+    closeNamedObservers: function() {
+      if (this._namedObservers) {
+        var keys=Object.keys(this._namedObservers);
+        for (var i=0, l=keys.length, k, o; (i < l) && (k=keys[i]); i++) {
+          o = this._namedObservers[k];
+          o.close();
+        }
+        this._namedObservers = {};
+      }
+    }
+  };
+
+  // property binding
+  // bind a property in A to a path in B by converting A[property] to a
+  // getter/setter pair that accesses B[...path...]
+  function bindProperties(inA, inProperty, observable) {
+    log.bind && console.log(LOG_BIND_PROPS, inB.localName || 'object', inPath, inA.localName, inProperty);
+    // capture A's value if B's value is null or undefined,
+    // otherwise use B's value
+    // TODO(sorvell): need to review, can do with ObserverTransform
+    var v = observable.discardChanges();
+    if (v === null || v === undefined) {
+      observable.setValue(inA[inProperty]);
+    }
+    return Observer.defineComputedProperty(inA, inProperty, observable);
+  }
+
+  // logging
+  var LOG_OBSERVE = '[%s] watching [%s]';
+  var LOG_OBSERVED = '[%s#%s] watch: [%s] now [%s] was [%s]';
+  var LOG_CHANGED = '[%s#%s] propertyChanged: [%s] now [%s] was [%s]';
+  var LOG_BIND_PROPS = "[%s]: bindProperties: [%s] to [%s].[%s]";
+
+  // exports
+
+  scope.api.instance.properties = properties;
+
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  // imports
+
+  var log = window.logFlags || 0;
+  var events = scope.api.instance.events;
+
+  var syntax = new PolymerExpressions();
+  syntax.resolveEventHandler = function(model, path, node) {
+    var ctlr = findEventController(node);
+    if (ctlr) {
+      var fn = path.getValueFrom(ctlr);
+      if (fn) {
+        return fn.bind(ctlr);
+      }
+    }
+  }
+
+  // An event controller is the host element for the shadowRoot in which 
+  // the node exists, or the first ancestor with a 'lightDomController'
+  // property.
+  function findEventController(node) {
+    while (node.parentNode) {
+      if (node.lightDomController) {
+        return node;
+      }
+      node = node.parentNode;
+    }
+    return node.host;
+  };
+
+  // element api supporting mdv
+
+  var mdv = {
+    syntax: syntax,
+    instanceTemplate: function(template) {
+      var dom = template.createInstance(this, this.syntax);
+      this.registerObservers(dom.bindings_);
+      return dom;
+    },
+    bind: function(name, observable, oneTime) {
+      var property = this.propertyForAttribute(name);
+      if (!property) {
+        // TODO(sjmiles): this mixin method must use the special form
+        // of `super` installed by `mixinMethod` in declaration/prototype.js
+        return this.mixinSuper(arguments);
+      } else {
+        // use n-way Polymer binding
+        var observer = this.bindProperty(property, observable);
+        this.reflectPropertyToAttribute(property);
+        // NOTE: reflecting binding information is typically required only for
+        // tooling. It has a performance cost so it's opt-in in Node.bind.
+        if (Platform.enableBindingsReflection) {
+          observer.path = observable.path_;
+          this.bindings_ = this.bindings_ || {};
+          this.bindings_[name] = observer;
+        }
+        return observer;
+      }
+    },
+    // TODO(sorvell): unbind/unbindAll has been removed, as public api, from
+    // TemplateBinding. We still need to close/dispose of observers but perhaps
+    // we should choose a more explicit name.
+    asyncUnbindAll: function() {
+      if (!this._unbound) {
+        log.unbind && console.log('[%s] asyncUnbindAll', this.localName);
+        this._unbindAllJob = this.job(this._unbindAllJob, this.unbindAll, 0);
+      }
+    },
+    unbindAll: function() {
+      if (!this._unbound) {
+        this.closeObservers();
+        this.closeNamedObservers();
+        this._unbound = true;
+      }
+    },
+    cancelUnbindAll: function() {
+      if (this._unbound) {
+        log.unbind && console.warn('[%s] already unbound, cannot cancel unbindAll', this.localName);
+        return;
+      }
+      log.unbind && console.log('[%s] cancelUnbindAll', this.localName);
+      if (this._unbindAllJob) {
+        this._unbindAllJob = this._unbindAllJob.stop();
+      }
+    }
+  };
+
+  function unbindNodeTree(node) {
+    forNodeTree(node, _nodeUnbindAll);
+  }
+
+  function _nodeUnbindAll(node) {
+    node.unbindAll();
+  }
+
+  function forNodeTree(node, callback) {
+    if (node) {
+      callback(node);
+      for (var child = node.firstChild; child; child = child.nextSibling) {
+        forNodeTree(child, callback);
+      }
+    }
+  }
+
+  var mustachePattern = /\{\{([^{}]*)}}/;
+
+  // exports
+
+  scope.bindPattern = mustachePattern;
+  scope.api.instance.mdv = mdv;
+
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  var base = {
+    PolymerBase: true,
+    job: function(job, callback, wait) {
+      if (typeof job === 'string') {
+        var n = '___' + job;
+        this[n] = Polymer.job.call(this, this[n], callback, wait);
+      } else {
+        return Polymer.job.call(this, job, callback, wait);
+      }
+    },
+    super: Polymer.super,
+    // user entry point for element has had its createdCallback called
+    created: function() {
+    },
+    // user entry point for element has shadowRoot and is ready for
+    // api interaction
+    ready: function() {
+    },
+    createdCallback: function() {
+      this.created();
+      this.prepareElement();
+    },
+    // system entry point, do not override
+    prepareElement: function() {
+      this._elementPrepared = true;
+      // install shadowRoots storage
+      this.shadowRoots = {};
+      // storage for closeable observers.
+      this._observers = [];
+      // install property observers
+      this.observeProperties();
+      // install boilerplate attributes
+      this.copyInstanceAttributes();
+      // process input attributes
+      this.takeAttributes();
+      // add event listeners
+      this.addHostListeners();
+      // process declarative resources
+      this.parseDeclarations(this.__proto__);
+      // TODO(sorvell): CE polyfill uses unresolved attribute to simulate
+      // :unresolved; remove this attribute to be compatible with native
+      // CE.
+      this.removeAttribute('unresolved');
+      // user entry point
+      this.ready();
+    },
+    attachedCallback: function() {
+      this.cancelUnbindAll();
+      // invoke user action
+      if (this.attached) {
+        this.attached();
+      }
+      // TODO(sorvell): bc
+      if (this.enteredView) {
+        this.enteredView();
+      }
+      // NOTE: domReady can be used to access elements in dom (descendants, 
+      // ancestors, siblings) such that the developer is enured to upgrade
+      // ordering. If the element definitions have loaded, domReady
+      // can be used to access upgraded elements.
+      if (!this.hasBeenAttached) {
+        this.hasBeenAttached = true;
+        if (this.domReady) {
+          this.async('domReady');
+        }
+      }
+    },
+    detachedCallback: function() {
+      if (!this.preventDispose) {
+        this.asyncUnbindAll();
+      }
+      // invoke user action
+      if (this.detached) {
+        this.detached();
+      }
+      // TODO(sorvell): bc
+      if (this.leftView) {
+        this.leftView();
+      }
+    },
+    // TODO(sorvell): bc
+    enteredViewCallback: function() {
+      this.attachedCallback();
+    },
+    // TODO(sorvell): bc
+    leftViewCallback: function() {
+      this.detachedCallback();
+    },
+    // TODO(sorvell): bc
+    enteredDocumentCallback: function() {
+      this.attachedCallback();
+    },
+    // TODO(sorvell): bc
+    leftDocumentCallback: function() {
+      this.detachedCallback();
+    },
+    // recursive ancestral <element> initialization, oldest first
+    parseDeclarations: function(p) {
+      if (p && p.element) {
+        this.parseDeclarations(p.__proto__);
+        p.parseDeclaration.call(this, p.element);
+      }
+    },
+    // parse input <element> as needed, override for custom behavior
+    parseDeclaration: function(elementElement) {
+      var template = this.fetchTemplate(elementElement);
+      if (template) {
+        var root = this.shadowFromTemplate(template);
+        this.shadowRoots[elementElement.name] = root;
+      }
+    },
+    // return a shadow-root template (if desired), override for custom behavior
+    fetchTemplate: function(elementElement) {
+      return elementElement.querySelector('template');
+    },
+    // utility function that creates a shadow root from a <template>
+    shadowFromTemplate: function(template) {
+      if (template) {
+        // make a shadow root
+        var root = this.createShadowRoot();
+        // stamp template
+        // which includes parsing and applying MDV bindings before being 
+        // inserted (to avoid {{}} in attribute values)
+        // e.g. to prevent <img src="images/{{icon}}"> from generating a 404.
+        var dom = this.instanceTemplate(template);
+        // append to shadow dom
+        root.appendChild(dom);
+        // perform post-construction initialization tasks on shadow root
+        this.shadowRootReady(root, template);
+        // return the created shadow root
+        return root;
+      }
+    },
+    // utility function that stamps a <template> into light-dom
+    lightFromTemplate: function(template, refNode) {
+      if (template) {
+        // TODO(sorvell): mark this element as a lightDOMController so that
+        // event listeners on bound nodes inside it will be called on it.
+        // Note, the expectation here is that events on all descendants 
+        // should be handled by this element.
+        this.lightDomController = true;
+        // stamp template
+        // which includes parsing and applying MDV bindings before being 
+        // inserted (to avoid {{}} in attribute values)
+        // e.g. to prevent <img src="images/{{icon}}"> from generating a 404.
+        var dom = this.instanceTemplate(template);
+        // append to shadow dom
+        if (refNode) {
+          this.insertBefore(dom, refNode);          
+        } else {
+          this.appendChild(dom);
+        }
+        // perform post-construction initialization tasks on ahem, light root
+        this.shadowRootReady(this);
+        // return the created shadow root
+        return dom;
+      }
+    },
+    shadowRootReady: function(root) {
+      // locate nodes with id and store references to them in this.$ hash
+      this.marshalNodeReferences(root);
+      // set up pointer gestures
+      PointerGestures.register(root);
+    },
+    // locate nodes with id and store references to them in this.$ hash
+    marshalNodeReferences: function(root) {
+      // establish $ instance variable
+      var $ = this.$ = this.$ || {};
+      // populate $ from nodes with ID from the LOCAL tree
+      if (root) {
+        var n$ = root.querySelectorAll("[id]");
+        for (var i=0, l=n$.length, n; (i<l) && (n=n$[i]); i++) {
+          $[n.id] = n;
+        };
+      }
+    },
+    attributeChangedCallback: function(name, oldValue) {
+      // TODO(sjmiles): adhoc filter
+      if (name !== 'class' && name !== 'style') {
+        this.attributeToProperty(name, this.getAttribute(name));
+      }
+      if (this.attributeChanged) {
+        this.attributeChanged.apply(this, arguments);
+      }
+    },
+    onMutation: function(node, listener) {
+      var observer = new MutationObserver(function(mutations) {
+        listener.call(this, observer, mutations);
+        observer.disconnect();
+      }.bind(this));
+      observer.observe(node, {childList: true, subtree: true});
+    }
+  };
+
+  // true if object has own PolymerBase api
+  function isBase(object) {
+    return object.hasOwnProperty('PolymerBase') 
+  }
+
+  // name a base constructor for dev tools
+
+  function PolymerBase() {};
+  PolymerBase.prototype = base;
+  base.constructor = PolymerBase;
+  
+  // exports
+
+  scope.Base = PolymerBase;
+  scope.isBase = isBase;
+  scope.api.instance.base = base;
+  
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  // imports
+
+  var log = window.logFlags || {};
+  
+  // magic words
+  
+  var STYLE_SCOPE_ATTRIBUTE = 'element';
+  var STYLE_CONTROLLER_SCOPE = 'controller';
+  
+  var styles = {
+    STYLE_SCOPE_ATTRIBUTE: STYLE_SCOPE_ATTRIBUTE,
+    /**
+     * Installs external stylesheets and <style> elements with the attribute 
+     * polymer-scope='controller' into the scope of element. This is intended
+     * to be a called during custom element construction.
+    */
+    installControllerStyles: function() {
+      // apply controller styles, but only if they are not yet applied
+      var scope = this.findStyleScope();
+      if (scope && !this.scopeHasNamedStyle(scope, this.localName)) {
+        // allow inherited controller styles
+        var proto = getPrototypeOf(this), cssText = '';
+        while (proto && proto.element) {
+          cssText += proto.element.cssTextForScope(STYLE_CONTROLLER_SCOPE);
+          proto = getPrototypeOf(proto);
+        }
+        if (cssText) {
+          this.installScopeCssText(cssText, scope);
+        }
+      }
+    },
+    installScopeStyle: function(style, name, scope) {
+      var scope = scope || this.findStyleScope(), name = name || '';
+      if (scope && !this.scopeHasNamedStyle(scope, this.localName + name)) {
+        var cssText = '';
+        if (style instanceof Array) {
+          for (var i=0, l=style.length, s; (i<l) && (s=style[i]); i++) {
+            cssText += s.textContent + '\n\n';
+          }
+        } else {
+          cssText = style.textContent;
+        }
+        this.installScopeCssText(cssText, scope, name);
+      }
+    },
+    installScopeCssText: function(cssText, scope, name) {
+      scope = scope || this.findStyleScope();
+      name = name || '';
+      if (!scope) {
+        return;
+      }
+      if (window.ShadowDOMPolyfill) {
+        cssText = shimCssText(cssText, scope.host);
+      }
+      var style = this.element.cssTextToScopeStyle(cssText,
+          STYLE_CONTROLLER_SCOPE);
+      Polymer.applyStyleToScope(style, scope);
+      // cache that this style has been applied
+      scope._scopeStyles[this.localName + name] = true;
+    },
+    findStyleScope: function(node) {
+      // find the shadow root that contains this element
+      var n = node || this;
+      while (n.parentNode) {
+        n = n.parentNode;
+      }
+      return n;
+    },
+    scopeHasNamedStyle: function(scope, name) {
+      scope._scopeStyles = scope._scopeStyles || {};
+      return scope._scopeStyles[name];
+    }
+  };
+  
+  // NOTE: use raw prototype traversal so that we ensure correct traversal
+  // on platforms where the protoype chain is simulated via __proto__ (IE10)
+  function getPrototypeOf(prototype) {
+    return prototype.__proto__;
+  }
+
+  function shimCssText(cssText, host) {
+    var name = '', is = false;
+    if (host) {
+      name = host.localName;
+      is = host.hasAttribute('is');
+    }
+    var selector = Platform.ShadowCSS.makeScopeSelector(name, is);
+    return Platform.ShadowCSS.shimCssText(cssText, selector);
+  }
+
+  // exports
+
+  scope.api.instance.styles = styles;
+  
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  // imports
+
+  var extend = scope.extend;
+  var api = scope.api;
+
+  // imperative implementation: Polymer()
+
+  // specify an 'own' prototype for tag `name`
+  function element(name, prototype) {
+    if (arguments.length === 1 && typeof arguments[0] !== 'string') {
+      prototype = name;
+      var script = document._currentScript;
+      name = script && script.parentNode && script.parentNode.getAttribute ?
+          script.parentNode.getAttribute('name') : '';
+      if (!name) {
+        throw 'Element name could not be inferred.';
+      }
+    }
+    if (getRegisteredPrototype[name]) {
+      throw 'Already registered (Polymer) prototype for element ' + name;
+    }
+    // cache the prototype
+    registerPrototype(name, prototype);
+    // notify the registrar waiting for 'name', if any
+    notifyPrototype(name);
+  }
+
+  // async prototype source
+
+  function waitingForPrototype(name, client) {
+    waitPrototype[name] = client;
+  }
+
+  var waitPrototype = {};
+
+  function notifyPrototype(name) {
+    if (waitPrototype[name]) {
+      waitPrototype[name].registerWhenReady();
+      delete waitPrototype[name];
+    }
+  }
+
+  // utility and bookkeeping
+
+  // maps tag names to prototypes, as registered with
+  // Polymer. Prototypes associated with a tag name
+  // using document.registerElement are available from
+  // HTMLElement.getPrototypeForTag().
+  // If an element was fully registered by Polymer, then
+  // Polymer.getRegisteredPrototype(name) === 
+  //   HTMLElement.getPrototypeForTag(name)
+
+  var prototypesByName = {};
+
+  function registerPrototype(name, prototype) {
+    return prototypesByName[name] = prototype || {};
+  }
+
+  function getRegisteredPrototype(name) {
+    return prototypesByName[name];
+  }
+
+  // exports
+
+  scope.getRegisteredPrototype = getRegisteredPrototype;
+  scope.waitingForPrototype = waitingForPrototype;
+
+  // namespace shenanigans so we can expose our scope on the registration 
+  // function
+
+  // make window.Polymer reference `element()`
+
+  window.Polymer = element;
+
+  // TODO(sjmiles): find a way to do this that is less terrible
+  // copy window.Polymer properties onto `element()`
+
+  extend(Polymer, scope);
+
+  // Under the HTMLImports polyfill, scripts in the main document
+  // do not block on imports; we want to allow calls to Polymer in the main
+  // document. Platform collects those calls until we can process them, which
+  // we do here.
+
+  var declarations = Platform.deliverDeclarations();
+  if (declarations) {
+    for (var i=0, l=declarations.length, d; (i<l) && (d=declarations[i]); i++) {
+      element.apply(null, d);
+    }
+  }
+
+})(Polymer);
+</script>
+<script>/* 
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+
+(function(scope) {
+
+var path = {
+  resolveElementPaths: function(node) {
+    Platform.urlResolver.resolveDom(node);
+  },
+  addResolvePathApi: function() {
+    // let assetpath attribute modify the resolve path
+    var assetPath = this.getAttribute('assetpath') || '';
+    var root = new URL(assetPath, this.ownerDocument.baseURI);
+    this.prototype.resolvePath = function(urlPath, base) {
+      var u = new URL(urlPath, base || root);
+      return u.href;
+    };
+  }
+};
+
+// exports
+scope.api.declaration.path = path;
+
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  // imports
+
+  var log = window.logFlags || {};
+  var api = scope.api.instance.styles;
+  var STYLE_SCOPE_ATTRIBUTE = api.STYLE_SCOPE_ATTRIBUTE;
+
+  // magic words
+
+  var STYLE_SELECTOR = 'style';
+  var STYLE_LOADABLE_MATCH = '@import';
+  var SHEET_SELECTOR = 'link[rel=stylesheet]';
+  var STYLE_GLOBAL_SCOPE = 'global';
+  var SCOPE_ATTR = 'polymer-scope';
+
+  var styles = {
+    // returns true if resources are loading
+    loadStyles: function(callback) {
+      var content = this.templateContent();
+      if (content) {
+        this.convertSheetsToStyles(content);
+      }
+      var styles = this.findLoadableStyles(content);
+      if (styles.length) {
+        Platform.styleResolver.loadStyles(styles, callback);
+      } else if (callback) {
+        callback();
+      }
+    },
+    convertSheetsToStyles: function(root) {
+      var s$ = root.querySelectorAll(SHEET_SELECTOR);
+      for (var i=0, l=s$.length, s, c; (i<l) && (s=s$[i]); i++) {
+        c = createStyleElement(importRuleForSheet(s, this.ownerDocument.baseURI),
+            this.ownerDocument);
+        this.copySheetAttributes(c, s);
+        s.parentNode.replaceChild(c, s);
+      }
+    },
+    copySheetAttributes: function(style, link) {
+      for (var i=0, a$=link.attributes, l=a$.length, a; (a=a$[i]) && i<l; i++) {
+        if (a.name !== 'rel' && a.name !== 'href') {
+          style.setAttribute(a.name, a.value);
+        }
+      }
+    },
+    findLoadableStyles: function(root) {
+      var loadables = [];
+      if (root) {
+        var s$ = root.querySelectorAll(STYLE_SELECTOR);
+        for (var i=0, l=s$.length, s; (i<l) && (s=s$[i]); i++) {
+          if (s.textContent.match(STYLE_LOADABLE_MATCH)) {
+            loadables.push(s);
+          }
+        }
+      }
+      return loadables;
+    },
+    /**
+     * Install external stylesheets loaded in <polymer-element> elements into the 
+     * element's template.
+     * @param elementElement The <element> element to style.
+     */
+    installSheets: function() {
+      this.cacheSheets();
+      this.cacheStyles();
+      this.installLocalSheets();
+      this.installGlobalStyles();
+    },
+    /**
+     * Remove all sheets from element and store for later use.
+     */
+    cacheSheets: function() {
+      this.sheets = this.findNodes(SHEET_SELECTOR);
+      this.sheets.forEach(function(s) {
+        if (s.parentNode) {
+          s.parentNode.removeChild(s);
+        }
+      });
+    },
+    cacheStyles: function() {
+      this.styles = this.findNodes(STYLE_SELECTOR + '[' + SCOPE_ATTR + ']');
+      this.styles.forEach(function(s) {
+        if (s.parentNode) {
+          s.parentNode.removeChild(s);
+        }
+      });
+    },
+    /**
+     * Takes external stylesheets loaded in an <element> element and moves
+     * their content into a <style> element inside the <element>'s template.
+     * The sheet is then removed from the <element>. This is done only so 
+     * that if the element is loaded in the main document, the sheet does
+     * not become active.
+     * Note, ignores sheets with the attribute 'polymer-scope'.
+     * @param elementElement The <element> element to style.
+     */
+    installLocalSheets: function () {
+      var sheets = this.sheets.filter(function(s) {
+        return !s.hasAttribute(SCOPE_ATTR);
+      });
+      var content = this.templateContent();
+      if (content) {
+        var cssText = '';
+        sheets.forEach(function(sheet) {
+          cssText += cssTextFromSheet(sheet) + '\n';
+        });
+        if (cssText) {
+          var style = createStyleElement(cssText, this.ownerDocument);
+          content.insertBefore(style, content.firstChild);
+        }
+      }
+    },
+    findNodes: function(selector, matcher) {
+      var nodes = this.querySelectorAll(selector).array();
+      var content = this.templateContent();
+      if (content) {
+        var templateNodes = content.querySelectorAll(selector).array();
+        nodes = nodes.concat(templateNodes);
+      }
+      return matcher ? nodes.filter(matcher) : nodes;
+    },
+    templateContent: function() {
+      var template = this.querySelector('template');
+      return template && templateContent(template);
+    },
+    /**
+     * Promotes external stylesheets and <style> elements with the attribute 
+     * polymer-scope='global' into global scope.
+     * This is particularly useful for defining @keyframe rules which 
+     * currently do not function in scoped or shadow style elements.
+     * (See wkb.ug/72462)
+     * @param elementElement The <element> element to style.
+    */
+    // TODO(sorvell): remove when wkb.ug/72462 is addressed.
+    installGlobalStyles: function() {
+      var style = this.styleForScope(STYLE_GLOBAL_SCOPE);
+      applyStyleToScope(style, document.head);
+    },
+    cssTextForScope: function(scopeDescriptor) {
+      var cssText = '';
+      // handle stylesheets
+      var selector = '[' + SCOPE_ATTR + '=' + scopeDescriptor + ']';
+      var matcher = function(s) {
+        return matchesSelector(s, selector);
+      };
+      var sheets = this.sheets.filter(matcher);
+      sheets.forEach(function(sheet) {
+        cssText += cssTextFromSheet(sheet) + '\n\n';
+      });
+      // handle cached style elements
+      var styles = this.styles.filter(matcher);
+      styles.forEach(function(style) {
+        cssText += style.textContent + '\n\n';
+      });
+      return cssText;
+    },
+    styleForScope: function(scopeDescriptor) {
+      var cssText = this.cssTextForScope(scopeDescriptor);
+      return this.cssTextToScopeStyle(cssText, scopeDescriptor);
+    },
+    cssTextToScopeStyle: function(cssText, scopeDescriptor) {
+      if (cssText) {
+        var style = createStyleElement(cssText);
+        style.setAttribute(STYLE_SCOPE_ATTRIBUTE, this.getAttribute('name') +
+            '-' + scopeDescriptor);
+        return style;
+      }
+    }
+  };
+
+  function importRuleForSheet(sheet, baseUrl) {
+    var href = new URL(sheet.getAttribute('href'), baseUrl).href;
+    return '@import \'' + href + '\';';
+  }
+
+  function applyStyleToScope(style, scope) {
+    if (style) {
+      if (scope === document) {
+        scope = document.head;
+      }
+      if (window.ShadowDOMPolyfill) {
+        scope = document.head;
+      }
+      // TODO(sorvell): necessary for IE
+      // see https://connect.microsoft.com/IE/feedback/details/790212/
+      // cloning-a-style-element-and-adding-to-document-produces
+      // -unexpected-result#details
+      // var clone = style.cloneNode(true);
+      var clone = createStyleElement(style.textContent);
+      var attr = style.getAttribute(STYLE_SCOPE_ATTRIBUTE);
+      if (attr) {
+        clone.setAttribute(STYLE_SCOPE_ATTRIBUTE, attr);
+      }
+      // TODO(sorvell): probably too brittle; try to figure out 
+      // where to put the element.
+      var refNode = scope.firstElementChild;
+      if (scope === document.head) {
+        var selector = 'style[' + STYLE_SCOPE_ATTRIBUTE + ']';
+        var s$ = document.head.querySelectorAll(selector);
+        if (s$.length) {
+          refNode = s$[s$.length-1].nextElementSibling;
+        }
+      }
+      scope.insertBefore(clone, refNode);
+    }
+  }
+
+  function createStyleElement(cssText, scope) {
+    scope = scope || document;
+    scope = scope.createElement ? scope : scope.ownerDocument;
+    var style = scope.createElement('style');
+    style.textContent = cssText;
+    return style;
+  }
+
+  function cssTextFromSheet(sheet) {
+    return (sheet && sheet.__resource) || '';
+  }
+
+  function matchesSelector(node, inSelector) {
+    if (matches) {
+      return matches.call(node, inSelector);
+    }
+  }
+  var p = HTMLElement.prototype;
+  var matches = p.matches || p.matchesSelector || p.webkitMatchesSelector 
+      || p.mozMatchesSelector;
+  
+  // exports
+
+  scope.api.declaration.styles = styles;
+  scope.applyStyleToScope = applyStyleToScope;
+  
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+
+(function(scope) {
+
+  // imports
+
+  var log = window.logFlags || {};
+  var api = scope.api.instance.events;
+  var EVENT_PREFIX = api.EVENT_PREFIX;
+  // polymer-element declarative api: events feature
+
+  var events = { 
+    parseHostEvents: function() {
+      // our delegates map
+      var delegates = this.prototype.eventDelegates;
+      // extract data from attributes into delegates
+      this.addAttributeDelegates(delegates);
+    },
+    addAttributeDelegates: function(delegates) {
+      // for each attribute
+      for (var i=0, a; a=this.attributes[i]; i++) {
+        // does it have magic marker identifying it as an event delegate?
+        if (this.hasEventPrefix(a.name)) {
+          // if so, add the info to delegates
+          delegates[this.removeEventPrefix(a.name)] = a.value.replace('{{', '')
+              .replace('}}', '').trim();
+        }
+      }
+    },
+    // starts with 'on-'
+    hasEventPrefix: function (n) {
+      return n && (n[0] === 'o') && (n[1] === 'n') && (n[2] === '-');
+    },
+    removeEventPrefix: function(n) {
+      return n.slice(prefixLength);
+    }
+  };
+
+  var prefixLength = EVENT_PREFIX.length;
+
+  // exports
+  scope.api.declaration.events = events;
+
+})(Polymer);</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  // element api
+
+  var properties = {
+    inferObservers: function(prototype) {
+      // called before prototype.observe is chained to inherited object
+      var observe = prototype.observe, property;
+      for (var n in prototype) {
+        if (n.slice(-7) === 'Changed') {
+          if (!observe) {
+            observe  = (prototype.observe = {});
+          }
+          property = n.slice(0, -7)
+          observe[property] = observe[property] || n;
+        }
+      }
+    },
+    explodeObservers: function(prototype) {
+      // called before prototype.observe is chained to inherited object
+      var o = prototype.observe;
+      if (o) {
+        var exploded = {};
+        for (var n in o) {
+          var names = n.split(' ');
+          for (var i=0, ni; ni=names[i]; i++) {
+            exploded[ni] = o[n];
+          }
+        }
+        prototype.observe = exploded;
+      }
+    },
+    optimizePropertyMaps: function(prototype) {
+      if (prototype.observe) {
+        // construct name list
+        var a = prototype._observeNames = [];
+        for (var n in prototype.observe) {
+          var names = n.split(' ');
+          for (var i=0, ni; ni=names[i]; i++) {
+            a.push(ni);
+          }
+        }
+      }
+      if (prototype.publish) {
+        // construct name list
+        var a = prototype._publishNames = [];
+        for (var n in prototype.publish) {
+          a.push(n);
+        }
+      }
+    },
+    publishProperties: function(prototype, base) {
+      // if we have any properties to publish
+      var publish = prototype.publish;
+      if (publish) {
+        // transcribe `publish` entries onto own prototype
+        this.requireProperties(publish, prototype, base);
+        // construct map of lower-cased property names
+        prototype._publishLC = this.lowerCaseMap(publish);
+      }
+    },
+    requireProperties: function(properties, prototype, base) {
+      // ensure a prototype value for each property
+      for (var n in properties) {
+        if (prototype[n] === undefined && base[n] === undefined) {
+          prototype[n] = properties[n];
+        }
+      }
+    },
+    lowerCaseMap: function(properties) {
+      var map = {};
+      for (var n in properties) {
+        map[n.toLowerCase()] = n;
+      }
+      return map;
+    }
+  };
+
+  // exports
+
+  scope.api.declaration.properties = properties;
+
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  // magic words
+
+  var ATTRIBUTES_ATTRIBUTE = 'attributes';
+  var ATTRIBUTES_REGEX = /\s|,/;
+
+  // attributes api
+
+  var attributes = {
+    inheritAttributesObjects: function(prototype) {
+      // chain our lower-cased publish map to the inherited version
+      this.inheritObject(prototype, 'publishLC');
+      // chain our instance attributes map to the inherited version
+      this.inheritObject(prototype, '_instanceAttributes');
+    },
+    publishAttributes: function(prototype, base) {
+      // merge names from 'attributes' attribute
+      var attributes = this.getAttribute(ATTRIBUTES_ATTRIBUTE);
+      if (attributes) {
+        // get properties to publish
+        var publish = prototype.publish || (prototype.publish = {});
+        // names='a b c' or names='a,b,c'
+        var names = attributes.split(ATTRIBUTES_REGEX);
+        // record each name for publishing
+        for (var i=0, l=names.length, n; i<l; i++) {
+          // remove excess ws
+          n = names[i].trim();
+          // do not override explicit entries
+          if (n && publish[n] === undefined && base[n] === undefined) {
+            publish[n] = null;
+          }
+        }
+      }
+    },
+    // record clonable attributes from <element>
+    accumulateInstanceAttributes: function() {
+      // inherit instance attributes
+      var clonable = this.prototype._instanceAttributes;
+      // merge attributes from element
+      var a$ = this.attributes;
+      for (var i=0, l=a$.length, a; (i<l) && (a=a$[i]); i++) {  
+        if (this.isInstanceAttribute(a.name)) {
+          clonable[a.name] = a.value;
+        }
+      }
+    },
+    isInstanceAttribute: function(name) {
+      return !this.blackList[name] && name.slice(0,3) !== 'on-';
+    },
+    // do not clone these attributes onto instances
+    blackList: {
+      name: 1,
+      'extends': 1,
+      constructor: 1,
+      noscript: 1,
+      assetpath: 1,
+      'cache-csstext': 1
+    }
+  };
+
+  // add ATTRIBUTES_ATTRIBUTE to the blacklist
+  attributes.blackList[ATTRIBUTES_ATTRIBUTE] = 1;
+
+  // exports
+
+  scope.api.declaration.attributes = attributes;
+
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  // imports
+  
+  var api = scope.api;
+  var isBase = scope.isBase;
+  var extend = scope.extend;
+
+  // prototype api
+
+  var prototype = {
+
+    register: function(name, extendeeName) {
+      // build prototype combining extendee, Polymer base, and named api
+      this.buildPrototype(name, extendeeName);
+      // register our custom element with the platform
+      this.registerPrototype(name, extendeeName);
+      // reference constructor in a global named by 'constructor' attribute
+      this.publishConstructor();
+    },
+
+    buildPrototype: function(name, extendeeName) {
+      // get our custom prototype (before chaining)
+      var extension = scope.getRegisteredPrototype(name);
+      // get basal prototype
+      var base = this.generateBasePrototype(extendeeName);
+      // implement declarative features
+      this.desugarBeforeChaining(extension, base);
+      // join prototypes
+      this.prototype = this.chainPrototypes(extension, base);
+      // more declarative features
+      this.desugarAfterChaining(name, extendeeName);
+    },
+
+    desugarBeforeChaining: function(prototype, base) {
+      // back reference declaration element
+      // TODO(sjmiles): replace `element` with `elementElement` or `declaration`
+      prototype.element = this;
+      // transcribe `attributes` declarations onto own prototype's `publish`
+      this.publishAttributes(prototype, base);
+      // `publish` properties to the prototype and to attribute watch
+      this.publishProperties(prototype, base);
+      // infer observers for `observe` list based on method names
+      this.inferObservers(prototype);
+      // desugar compound observer syntax, e.g. 'a b c' 
+      this.explodeObservers(prototype);
+    },
+
+    chainPrototypes: function(prototype, base) {
+      // chain various meta-data objects to inherited versions
+      this.inheritMetaData(prototype, base);
+      // chain custom api to inherited
+      var chained = this.chainObject(prototype, base);
+      // x-platform fixup
+      ensurePrototypeTraversal(chained);
+      return chained;
+    },
+
+    inheritMetaData: function(prototype, base) {
+      // chain observe object to inherited
+      this.inheritObject('observe', prototype, base);
+      // chain publish object to inherited
+      this.inheritObject('publish', prototype, base);
+      // chain our lower-cased publish map to the inherited version
+      this.inheritObject('_publishLC', prototype, base);
+      // chain our instance attributes map to the inherited version
+      this.inheritObject('_instanceAttributes', prototype, base);
+      // chain our event delegates map to the inherited version
+      this.inheritObject('eventDelegates', prototype, base);
+    },
+
+    // implement various declarative features
+    desugarAfterChaining: function(name, extendee) {
+      // build side-chained lists to optimize iterations
+      this.optimizePropertyMaps(this.prototype);
+      // install external stylesheets as if they are inline
+      this.installSheets();
+      // adjust any paths in dom from imports
+      this.resolveElementPaths(this);
+      // compile list of attributes to copy to instances
+      this.accumulateInstanceAttributes();
+      // parse on-* delegates declared on `this` element
+      this.parseHostEvents();
+      //
+      // install a helper method this.resolvePath to aid in 
+      // setting resource urls. e.g.
+      // this.$.image.src = this.resolvePath('images/foo.png')
+      this.addResolvePathApi();
+      // under ShadowDOMPolyfill, transforms to approximate missing CSS features
+      if (window.ShadowDOMPolyfill) {
+        Platform.ShadowCSS.shimStyling(this.templateContent(), name, extendee);
+      }
+      // allow custom element access to the declarative context
+      if (this.prototype.registerCallback) {
+        this.prototype.registerCallback(this);
+      }
+    },
+
+    // if a named constructor is requested in element, map a reference
+    // to the constructor to the given symbol
+    publishConstructor: function() {
+      var symbol = this.getAttribute('constructor');
+      if (symbol) {
+        window[symbol] = this.ctor;
+      }
+    },
+
+    // build prototype combining extendee, Polymer base, and named api
+    generateBasePrototype: function(extnds) {
+      var prototype = this.findBasePrototype(extnds);
+      if (!prototype) {
+        // create a prototype based on tag-name extension
+        var prototype = HTMLElement.getPrototypeForTag(extnds);
+        // insert base api in inheritance chain (if needed)
+        prototype = this.ensureBaseApi(prototype);
+        // memoize this base
+        memoizedBases[extnds] = prototype;
+      }
+      return prototype;
+    },
+
+    findBasePrototype: function(name) {
+      return memoizedBases[name];
+    },
+
+    // install Polymer instance api into prototype chain, as needed 
+    ensureBaseApi: function(prototype) {
+      if (prototype.PolymerBase) {
+        return prototype;
+      }
+      var extended = Object.create(prototype);
+      // we need a unique copy of base api for each base prototype
+      // therefore we 'extend' here instead of simply chaining
+      api.publish(api.instance, extended);
+      // TODO(sjmiles): sharing methods across prototype chains is
+      // not supported by 'super' implementation which optimizes
+      // by memoizing prototype relationships.
+      // Probably we should have a version of 'extend' that is 
+      // share-aware: it could study the text of each function,
+      // look for usage of 'super', and wrap those functions in
+      // closures.
+      // As of now, there is only one problematic method, so 
+      // we just patch it manually.
+      // To avoid re-entrancy problems, the special super method
+      // installed is called `mixinSuper` and the mixin method
+      // must use this method instead of the default `super`.
+      this.mixinMethod(extended, prototype, api.instance.mdv, 'bind');
+      // return buffed-up prototype
+      return extended;
+    },
+
+    mixinMethod: function(extended, prototype, api, name) {
+      var $super = function(args) {
+        return prototype[name].apply(this, args);
+      };
+      extended[name] = function() {
+        this.mixinSuper = $super;
+        return api[name].apply(this, arguments);
+      }
+    },
+
+    // ensure prototype[name] inherits from a prototype.prototype[name]
+    inheritObject: function(name, prototype, base) {
+      // require an object
+      var source = prototype[name] || {};
+      // chain inherited properties onto a new object
+      prototype[name] = this.chainObject(source, base[name]);
+    },
+
+    // register 'prototype' to custom element 'name', store constructor 
+    registerPrototype: function(name, extendee) { 
+      var info = {
+        prototype: this.prototype
+      }
+      // native element must be specified in extends
+      var typeExtension = this.findTypeExtension(extendee);
+      if (typeExtension) {
+        info.extends = typeExtension;
+      }
+      // register the prototype with HTMLElement for name lookup
+      HTMLElement.register(name, this.prototype);
+      // register the custom type
+      this.ctor = document.registerElement(name, info);
+    },
+
+    findTypeExtension: function(name) {
+      if (name && name.indexOf('-') < 0) {
+        return name;
+      } else {
+        var p = this.findBasePrototype(name);
+        if (p.element) {
+          return this.findTypeExtension(p.element.extends);
+        }
+      }
+    }
+
+  };
+
+  // memoize base prototypes
+  var memoizedBases = {};
+
+  // implementation of 'chainObject' depends on support for __proto__
+  if (Object.__proto__) {
+    prototype.chainObject = function(object, inherited) {
+      if (object && inherited && object !== inherited) {
+        object.__proto__ = inherited;
+      }
+      return object;
+    }
+  } else {
+    prototype.chainObject = function(object, inherited) {
+      if (object && inherited && object !== inherited) {
+        var chained = Object.create(inherited);
+        object = extend(chained, object);
+      }
+      return object;
+    }
+  }
+
+  // On platforms that do not support __proto__ (versions of IE), the prototype
+  // chain of a custom element is simulated via installation of __proto__.
+  // Although custom elements manages this, we install it here so it's
+  // available during desugaring.
+  function ensurePrototypeTraversal(prototype) {
+    if (!Object.__proto__) {
+      var ancestor = Object.getPrototypeOf(prototype);
+      prototype.__proto__ = ancestor;
+      if (isBase(ancestor)) {
+        ancestor.__proto__ = Object.getPrototypeOf(ancestor);
+      }
+    }
+  }
+
+  // exports
+
+  api.declaration.prototype = prototype;
+
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  var queue = {
+    // tell the queue to wait for an element to be ready
+    wait: function(element, check, go) {
+      if (this.indexOf(element) === -1) {
+        this.add(element);
+        element.__check = check;
+        element.__go = go;
+      }
+      return (this.indexOf(element) !== 0);
+    },
+    add: function(element) {
+      //console.log('queueing', element.name);
+      queueForElement(element).push(element);
+    },
+    indexOf: function(element) {
+      var i = queueForElement(element).indexOf(element);
+      if (i >= 0 && document.contains(element)) {
+        i += (HTMLImports.useNative || HTMLImports.ready) ? 
+          importQueue.length : 1e9;
+      }
+      return i;  
+    },
+    // tell the queue an element is ready to be registered
+    go: function(element) {
+      var readied = this.remove(element);
+      if (readied) {
+        readied.__go.call(readied);
+        readied.__check = readied.__go = null;
+        this.check();
+      }
+    },
+    remove: function(element) {
+      var i = this.indexOf(element);
+      if (i !== 0) {
+        //console.warn('queue order wrong', i);
+        return;
+      }
+      return queueForElement(element).shift();
+    },
+    check: function() {
+      // next
+      var element = this.nextElement();
+      if (element) {
+        element.__check.call(element);
+      }
+      if (this.canReady()) {
+        this.ready();
+        return true;
+      }
+    },
+    nextElement: function() {
+      return nextQueued();
+    },
+    canReady: function() {
+      return !this.waitToReady && this.isEmpty();
+    },
+    isEmpty: function() {
+      return !importQueue.length && !mainQueue.length;
+    },
+    ready: function() {
+      // TODO(sorvell): As an optimization, turn off CE polyfill upgrading
+      // while registering. This way we avoid having to upgrade each document
+      // piecemeal per registration and can instead register all elements
+      // and upgrade once in a batch. Without this optimization, upgrade time
+      // degrades significantly when SD polyfill is used. This is mainly because
+      // querying the document tree for elements is slow under the SD polyfill.
+      if (CustomElements.ready === false) {
+        CustomElements.upgradeDocumentTree(document);
+        CustomElements.ready = true;
+      }
+      if (readyCallbacks) {
+        var fn;
+        while (readyCallbacks.length) {
+          fn = readyCallbacks.shift();
+          fn();
+        }
+      }
+    },
+    addReadyCallback: function(callback) {
+      if (callback) {
+        readyCallbacks.push(callback);
+      }
+    },
+    waitToReady: true
+  };
+
+  var importQueue = [];
+  var mainQueue = [];
+  var readyCallbacks = [];
+
+  function queueForElement(element) {
+    return document.contains(element) ? mainQueue : importQueue;
+  }
+
+  function nextQueued() {
+    return importQueue.length ? importQueue[0] : mainQueue[0];
+  }
+
+  var polymerReadied = false; 
+
+  document.addEventListener('WebComponentsReady', function() {
+    CustomElements.ready = false;
+  });
+  
+  function whenPolymerReady(callback) {
+    queue.waitToReady = true;
+    CustomElements.ready = false;
+    HTMLImports.whenImportsReady(function() {
+      queue.addReadyCallback(callback);
+      queue.waitToReady = false;
+      queue.check();
+    });
+  }
+
+  // exports
+  scope.queue = queue;
+  scope.whenPolymerReady = whenPolymerReady;
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  var whenPolymerReady = scope.whenPolymerReady;
+
+  function importElements(elementOrFragment, callback) {
+    if (elementOrFragment) {
+      document.head.appendChild(elementOrFragment);
+      whenPolymerReady(callback);
+    } else if (callback) {
+      callback();
+    }
+  }
+
+  function importUrls(urls, callback) {
+    if (urls && urls.length) {
+        var frag = document.createDocumentFragment();
+        for (var i=0, l=urls.length, url, link; (i<l) && (url=urls[i]); i++) {
+          link = document.createElement('link');
+          link.rel = 'import';
+          link.href = url;
+          frag.appendChild(link);
+        }
+        importElements(frag, callback);
+    } else if (callback) {
+      callback();
+    }
+  }
+
+  // exports
+  scope.import = importUrls;
+  scope.importElements = importElements;
+
+})(Polymer);
+</script>
+<script>/*
+ * Copyright 2013 The Polymer Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file.
+ */
+(function(scope) {
+
+  // imports
+
+  var extend = scope.extend;
+  var api = scope.api;
+  var queue = scope.queue;
+  var whenPolymerReady = scope.whenPolymerReady;
+  var getRegisteredPrototype = scope.getRegisteredPrototype;
+  var waitingForPrototype = scope.waitingForPrototype;
+
+  // declarative implementation: <polymer-element>
+
+  var prototype = extend(Object.create(HTMLElement.prototype), {
+
+    createdCallback: function() {
+      if (this.getAttribute('name')) {
+        this.init();
+      }
+    },
+
+    init: function() {
+      // fetch declared values
+      this.name = this.getAttribute('name');
+      this.extends = this.getAttribute('extends');
+      // initiate any async resource fetches
+      this.loadResources();
+      // register when all constraints are met
+      this.registerWhenReady();
+    },
+
+    registerWhenReady: function() {
+     if (this.registered
+       || this.waitingForPrototype(this.name)
+       || this.waitingForQueue()
+       || this.waitingForResources()) {
+          return;
+      }
+      // TODO(sorvell): ends up calling '_register' by virtue
+      // of `waitingForQueue` (see below)
+      queue.go(this);
+    },
+
+    // TODO(sorvell): refactor, this method is private-ish, but it's being
+    // called by the queue object.
+    _register: function() {
+      //console.log('registering', this.name);
+      //console.group('registering', this.name);
+      // warn if extending from a custom element not registered via Polymer
+      if (isCustomTag(this.extends) && !isRegistered(this.extends)) {
+        console.warn('%s is attempting to extend %s, an unregistered element ' +
+            'or one that was not registered with Polymer.', this.name,
+            this.extends);
+      }
+      this.register(this.name, this.extends);
+      this.registered = true;
+      //console.groupEnd();
+    },
+
+    waitingForPrototype: function(name) {
+      if (!getRegisteredPrototype(name)) {
+        // then wait for a prototype
+        waitingForPrototype(name, this);
+        // emulate script if user is not supplying one
+        this.handleNoScript(name);
+        // prototype not ready yet
+        return true;
+      }
+    },
+
+    handleNoScript: function(name) {
+      // if explicitly marked as 'noscript'
+      if (this.hasAttribute('noscript') && !this.noscript) {
+        this.noscript = true;
+        // TODO(sorvell): CustomElements polyfill awareness:
+        // noscript elements should upgrade in logical order
+        // script injection ensures this under native custom elements;
+        // under imports + ce polyfills, scripts run before upgrades.
+        // dependencies should be ready at upgrade time so register
+        // prototype at this time.
+        if (window.CustomElements && !CustomElements.useNative) {
+          Polymer(name);
+        } else {
+          var script = document.createElement('script');
+          script.textContent = 'Polymer(\'' + name + '\');';
+          this.appendChild(script);
+        }
+      }
+    },
+
+    waitingForResources: function() {
+      return this._needsResources;
+    },
+
+    // NOTE: Elements must be queued in proper order for inheritance/composition
+    // dependency resolution. Previously this was enforced for inheritance,
+    // and by rule for composition. It's now entirely by rule.
+    waitingForQueue: function() {
+      return queue.wait(this, this.registerWhenReady, this._register);
+    },
+
+    loadResources: function() {
+      this._needsResources = true;
+      this.loadStyles(function() {
+        this._needsResources = false;
+        this.registerWhenReady();
+      }.bind(this));
+    }
+
+  });
+
+  // semi-pluggable APIs 
+
+  // TODO(sjmiles): should be fully pluggable (aka decoupled, currently
+  // the various plugins are allowed to depend on each other directly)
+  api.publish(api.declaration, prototype);
+
+  // utility and bookkeeping
+
+  function isRegistered(name) {
+    return Boolean(HTMLElement.getPrototypeForTag(name));
+  }
+
+  function isCustomTag(name) {
+    return (name && name.indexOf('-') >= 0);
+  }
+
+  // exports
+
+  scope.getRegisteredPrototype = getRegisteredPrototype;
+  
+  // boot tasks
+
+  whenPolymerReady(function() {
+    document.body.removeAttribute('unresolved');
+    document.dispatchEvent(
+      new CustomEvent('polymer-ready', {bubbles: true})
+    );
+  });
+
+  // register polymer-element with document
+
+  document.registerElement('polymer-element', {prototype: prototype});
+
+})(Polymer);
+</script>
+
 <polymer-element name="polymer-body" extends="body" assetpath="../polymer/">
 
   <script>
@@ -31,42 +2505,13 @@
   </script>
 
 </polymer-element>
-<script>
-/**
- * @license
- * Copyright (c) 2012-2014 The Polymer Authors. All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
- * 
- *    * Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer.
- *    * Redistributions in binary form must reproduce the above
- * copyright notice, this list of conditions and the following disclaimer
- * in the documentation and/or other materials provided with the
- * distribution.
- *    * Neither the name of Google Inc. nor the names of its
- * contributors may be used to endorse or promote products derived from
- * this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-// @version: 0.2.1-c690632
-Polymer={},"function"==typeof window.Polymer&&(Polymer={}),function(a){function b(a,b){return a&&b&&Object.getOwnPropertyNames(b).forEach(function(c){var d=Object.getOwnPropertyDescriptor(b,c);d&&(Object.defineProperty(a,c,d),"function"==typeof d.value&&(d.value.nom=c))}),a}a.extend=b}(Polymer),function(a){function b(a,b,d){return a?a.stop():a=new c(this),a.go(b,d),a}var c=function(a){this.context=a,this.boundComplete=this.complete.bind(this)};c.prototype={go:function(a,b){this.callback=a;var c;b?(c=setTimeout(this.boundComplete,b),this.handle=function(){clearTimeout(c)}):(c=requestAnimationFrame(this.boundComplete),this.handle=function(){cancelAnimationFrame(c)})},stop:function(){this.handle&&(this.handle(),this.handle=null)},complete:function(){this.handle&&(this.stop(),this.callback.call(this.context))}},a.job=b}(Polymer),function(){var a={};HTMLElement.register=function(b,c){a[b]=c},HTMLElement.getPrototypeForTag=function(b){var c=b?a[b]:HTMLElement.prototype;return c||Object.getPrototypeOf(document.createElement(b))};var b=Event.prototype.stopPropagation;Event.prototype.stopPropagation=function(){this.cancelBubble=!0,b.apply(this,arguments)}}(Polymer),function(a){function b(a){var c=b.caller,g=c.nom,h=c._super;if(h||(g||(g=c.nom=e.call(this,c)),g||console.warn("called super() on a method not installed declaratively (has no .nom property)"),h=d(c,g,f(this))),h){var i=h[g];return i._super||d(i,g,h),i.apply(this,a||[])}}function c(a,b,c){for(;a;){if(a[b]!==c&&a[b])return a;a=f(a)}}function d(a,b,d){return a._super=c(d,b,a),a._super&&(a._super[b].nom=b),a._super}function e(a){for(var b=this.__proto__;b&&b!==HTMLElement.prototype;){for(var c,d=Object.getOwnPropertyNames(b),e=0,f=d.length;f>e&&(c=d[e]);e++){var g=Object.getOwnPropertyDescriptor(b,c);if("function"==typeof g.value&&g.value===a)return c}b=b.__proto__}}function f(a){return a.__proto__}a.super=b}(Polymer),function(a){function b(a,b){var d=typeof b;return b instanceof Date&&(d="date"),c[d](a,b)}var c={string:function(a){return a},date:function(a){return new Date(Date.parse(a)||Date.now())},"boolean":function(a){return""===a?!0:"false"===a?!1:!!a},number:function(a){var b=parseFloat(a);return 0===b&&(b=parseInt(a)),isNaN(b)?a:b},object:function(a,b){if(null===b)return a;try{return JSON.parse(a.replace(/'/g,'"'))}catch(c){return a}},"function":function(a,b){return b}};a.deserializeValue=b}(Polymer),function(a){var b=a.extend,c={};c.declaration={},c.instance={},c.publish=function(a,c){for(var d in a)b(c,a[d])},a.api=c}(Polymer),function(a){var b={async:function(a,b,c){Platform.flush(),b=b&&b.length?b:[b];var d=function(){(this[a]||a).apply(this,b)}.bind(this),e=c?setTimeout(d,c):requestAnimationFrame(d);return c?e:~e},cancelAsync:function(a){0>a?cancelAnimationFrame(~a):clearTimeout(a)},fire:function(a,b,c,d,e){var f=c||this,b=b||{},g=new CustomEvent(a,{bubbles:void 0!==d?d:!0,cancelable:void 0!==e?e:!0,detail:b});return f.dispatchEvent(g),g},asyncFire:function(){this.async("fire",arguments)},classFollows:function(a,b,c){b&&b.classList.remove(c),a&&a.classList.add(c)}},c=function(){},d={};b.asyncMethod=b.async,a.api.instance.utils=b,a.nop=c,a.nob=d}(Polymer),function(a){var b=window.logFlags||{},c="on-",d={EVENT_PREFIX:c,addHostListeners:function(){var a=this.eventDelegates;b.events&&Object.keys(a).length>0&&console.log("[%s] addHostListeners:",this.localName,a);var d,e,f=this;for(var g in a)e=c+g,(d=PolymerExpressions.prepareEventBinding(Path.get(a[g]),e,{resolveEventHandler:function(a,b){var c=b.getValueFrom(f);return c?c.bind(f):void 0}}))(this,this,!1)},dispatchMethod:function(a,c,d){if(a){b.events&&console.group("[%s] dispatch [%s]",a.localName,c);var e="function"==typeof c?c:a[c];e&&e[d?"apply":"call"](a,d),b.events&&console.groupEnd(),Platform.flush()}}};a.api.instance.events=d}(Polymer),function(a){var b={copyInstanceAttributes:function(){var a=this._instanceAttributes;for(var b in a)this.hasAttribute(b)||this.setAttribute(b,a[b])},takeAttributes:function(){if(this._publishLC)for(var a,b=0,c=this.attributes,d=c.length;(a=c[b])&&d>b;b++)this.attributeToProperty(a.name,a.value)},attributeToProperty:function(b,c){var b=this.propertyForAttribute(b);if(b){if(c&&c.search(a.bindPattern)>=0)return;var d=this[b],c=this.deserializeValue(c,d);c!==d&&(this[b]=c)}},propertyForAttribute:function(a){var b=this._publishLC&&this._publishLC[a];return b},deserializeValue:function(b,c){return a.deserializeValue(b,c)},serializeValue:function(a,b){return"boolean"===b?a?"":void 0:"object"!==b&&"function"!==b&&void 0!==a?a:void 0},reflectPropertyToAttribute:function(a){var b=typeof this[a],c=this.serializeValue(this[a],b);void 0!==c?this.setAttribute(a,c):"boolean"===b&&this.removeAttribute(a)}};a.api.instance.attributes=b}(Polymer),function(a){function b(a,b,d){c.bind&&console.log(e,inB.localName||"object",inPath,a.localName,b);var f=d.discardChanges();return(null===f||void 0===f)&&d.setValue(a[b]),Observer.defineComputedProperty(a,b,d)}var c=window.logFlags||{},d={observeProperties:function(){var a=this._observeNames,b=this._publishNames;if(a&&a.length||b&&b.length){var c=this._propertyObserver=new CompoundObserver;this.registerObservers([c]);for(var d,e=0,f=a.length;f>e&&(d=a[e]);e++){c.addPath(this,d);var g=Object.getOwnPropertyDescriptor(this.__proto__,d);g&&g.value&&this.observeArrayValue(d,g.value,null)}for(var d,e=0,f=b.length;f>e&&(d=b[e]);e++)this.observe&&void 0!==this.observe[d]||c.addPath(this,d);c.open(this.notifyPropertyChanges,this)}},notifyPropertyChanges:function(a,b,c){var d,e,f={};for(var g in b)d=c[2*g+1],void 0!==this.publish[d]&&this.reflectPropertyToAttribute(d),e=this.observe[d],e&&(this.observeArrayValue(d,a[g],b[g]),f[e]||(f[e]=!0,this.invokeMethod(e,[b[g],a[g],arguments])))},observeArrayValue:function(a,b,d){var e=this.observe[a];if(e&&(Array.isArray(d)&&(c.observe&&console.log("[%s] observeArrayValue: unregister observer [%s]",this.localName,a),this.closeNamedObserver(a+"__array")),Array.isArray(b))){c.observe&&console.log("[%s] observeArrayValue: register observer [%s]",this.localName,a,b);var f=new ArrayObserver(b);f.open(function(a,b){this.invokeMethod(e,[b])},this),this.registerNamedObserver(a+"__array",f)}},bindProperty:function(a,c){return b(this,a,c)},invokeMethod:function(a,b){var c=this[a]||a;"function"==typeof c&&c.apply(this,b)},registerObservers:function(a){this._observers.push(a)},closeObservers:function(){for(var a=0,b=this._observers.length;b>a;a++)this.closeObserverArray(this._observers[a]);this._observers=[]},closeObserverArray:function(a){for(var b,c=0,d=a.length;d>c;c++)b=a[c],b&&b.close&&b.close()},registerNamedObserver:function(a,b){var c=this._namedObservers||(this._namedObservers={});c[a]=b},closeNamedObserver:function(a){var b=this._namedObservers;return b&&b[a]?(b[a].close(),b[a]=null,!0):void 0},closeNamedObservers:function(){if(this._namedObservers){for(var a,b,c=Object.keys(this._namedObservers),d=0,e=c.length;e>d&&(a=c[d]);d++)b=this._namedObservers[a],b.close();this._namedObservers={}}}},e="[%s]: bindProperties: [%s] to [%s].[%s]";a.api.instance.properties=d}(Polymer),function(a){function b(a){for(;a.parentNode;){if(a.lightDomController)return a;a=a.parentNode}return a.host}var c=window.logFlags||0,d=(a.api.instance.events,new PolymerExpressions);d.resolveEventHandler=function(a,c,d){var e=b(d);if(e){var f=c.getValueFrom(e);if(f)return f.bind(e)}};var e={syntax:d,instanceTemplate:function(a){var b=a.createInstance(this,this.syntax);return this.registerObservers(b.bindings_),b},bind:function(a,b){this._elementPrepared||this.prepareElement();var c=this.propertyForAttribute(a);if(c){var d=this.bindProperty(c,b);return this.reflectPropertyToAttribute(c),Platform.enableBindingsReflection&&(d.path=b.path_,this.bindings_=this.bindings_||{},this.bindings_[a]=d),d}return this.mixinSuper(arguments)},asyncUnbindAll:function(){this._unbound||(c.unbind&&console.log("[%s] asyncUnbindAll",this.localName),this._unbindAllJob=this.job(this._unbindAllJob,this.unbindAll,0))},unbindAll:function(){this._unbound||(this.closeObservers(),this.closeNamedObservers(),this._unbound=!0)},cancelUnbindAll:function(){return this._unbound?void(c.unbind&&console.warn("[%s] already unbound, cannot cancel unbindAll",this.localName)):(c.unbind&&console.log("[%s] cancelUnbindAll",this.localName),void(this._unbindAllJob&&(this._unbindAllJob=this._unbindAllJob.stop())))}},f=/\{\{([^{}]*)}}/;a.bindPattern=f,a.api.instance.mdv=e}(Polymer),function(a){function b(a){return a.hasOwnProperty("PolymerBase")}function c(){}var d=0,e={PolymerBase:!0,job:Polymer.job,"super":Polymer.super,created:function(){},ready:function(){},createdCallback:function(){this.created(),(this.ownerDocument.defaultView||this.alwaysPrepare||d>0)&&this.prepareElement()},prepareElement:function(){this._elementPrepared=!0,this.shadowRoots={},this._observers=[],this.observeProperties(),this.copyInstanceAttributes(),this.takeAttributes(),this.addHostListeners(),d++,this.parseDeclarations(this.__proto__),d--,this.removeAttribute("unresolved"),this.ready()},attachedCallback:function(){this._elementPrepared||this.prepareElement(),this.cancelUnbindAll(!0),this.attached&&this.attached(),this.enteredView&&this.enteredView(),this.hasBeenAttached||(this.hasBeenAttached=!0,this.domReady&&this.async("domReady"))},detachedCallback:function(){this.preventDispose||this.asyncUnbindAll(),this.detached&&this.detached(),this.leftView&&this.leftView()},enteredViewCallback:function(){this.attachedCallback()},leftViewCallback:function(){this.detachedCallback()},enteredDocumentCallback:function(){this.attachedCallback()},leftDocumentCallback:function(){this.detachedCallback()},parseDeclarations:function(a){a&&a.element&&(this.parseDeclarations(a.__proto__),a.parseDeclaration.call(this,a.element))},parseDeclaration:function(a){var b=this.fetchTemplate(a);if(b){var c=this.shadowFromTemplate(b);this.shadowRoots[a.name]=c}},fetchTemplate:function(a){return a.querySelector("template")},shadowFromTemplate:function(a){if(a){var b=this.createShadowRoot();b.resetStyleInheritance=this.resetStyleInheritance;var c=this.instanceTemplate(a);return b.appendChild(c),this.shadowRootReady(b,a),b}},lightFromTemplate:function(a){if(a){this.lightDomController=!0;var b=this.instanceTemplate(a);return this.appendChild(b),this.shadowRootReady(this,a),b}},shadowRootReady:function(a){this.marshalNodeReferences(a),PointerGestures.register(a)},marshalNodeReferences:function(a){var b=this.$=this.$||{};if(a)for(var c,d=a.querySelectorAll("[id]"),e=0,f=d.length;f>e&&(c=d[e]);e++)b[c.id]=c},attributeChangedCallback:function(a){"class"!==a&&"style"!==a&&this.attributeToProperty(a,this.getAttribute(a)),this.attributeChanged&&this.attributeChanged.apply(this,arguments)},onMutation:function(a,b){var c=new MutationObserver(function(a){b.call(this,c,a),c.disconnect()}.bind(this));c.observe(a,{childList:!0,subtree:!0})}};c.prototype=e,e.constructor=c,a.Base=c,a.isBase=b,a.api.instance.base=e}(Polymer),function(a){function b(a){return a.__proto__}function c(a,b){var c="",d=!1;b&&(c=b.localName,d=b.hasAttribute("is"));var e=Platform.ShadowCSS.makeScopeSelector(c,d);return Platform.ShadowCSS.shimCssText(a,e)}var d=(window.logFlags||{},"element"),e="controller",f={STYLE_SCOPE_ATTRIBUTE:d,installControllerStyles:function(){var a=this.findStyleScope();if(a&&!this.scopeHasNamedStyle(a,this.localName)){for(var c=b(this),d="";c&&c.element;)d+=c.element.cssTextForScope(e),c=b(c);d&&this.installScopeCssText(d,a)}},installScopeStyle:function(a,b,c){var c=this.findStyleScope(c),b=b||"";if(c&&!this.scopeHasNamedStyle(c,this.localName+b)){var d="";if(a instanceof Array)for(var e,f=0,g=a.length;g>f&&(e=a[f]);f++)d+=e.textContent+"\n\n";else d=a.textContent;this.installScopeCssText(d,c,b)}},installScopeCssText:function(a,b,d){if(b=b||this.findStyleScope(),d=d||"",b){window.ShadowDOMPolyfill&&(a=c(a,b.host));var f=this.element.cssTextToScopeStyle(a,e);Polymer.applyStyleToScope(f,b),b._scopeStyles[this.localName+d]=!0}},findStyleScope:function(a){for(var b=a||this;b.parentNode;)b=b.parentNode;return b},scopeHasNamedStyle:function(a,b){return a._scopeStyles=a._scopeStyles||{},a._scopeStyles[b]}};a.api.instance.styles=f}(Polymer),function(a){function b(a,b){if(f[a])throw"Already registered (Polymer) prototype for element "+a;e(a,b),d(a)}function c(a,b){h[a]=b}function d(a){h[a]&&(h[a].registerWhenReady(),delete h[a])}function e(a,b){return i[a]=b||{}}function f(a){return i[a]}var g=a.extend,h=(a.api,{}),i={};a.getRegisteredPrototype=f,a.waitingForPrototype=c,window.Polymer=b,g(Polymer,a);var j=Platform.deliverDeclarations();if(j)for(var k,l=0,m=j.length;m>l&&(k=j[l]);l++)b.apply(null,k)}(Polymer),function(a){var b={resolveElementPaths:function(a){Platform.urlResolver.resolveDom(a)},addResolvePathApi:function(){var a=this.getAttribute("assetpath")||"",b=new URL(a,this.ownerDocument.baseURI);this.prototype.resolvePath=function(a,c){var d=new URL(a,c||b);return d.href}}};a.api.declaration.path=b}(Polymer),function(a){function b(a,b){var c=new URL(a.getAttribute("href"),b).href;return"@import '"+c+"';"}function c(a,b){if(a){b===document&&(b=document.head),window.ShadowDOMPolyfill&&(b=document.head);var c=d(a.textContent),e=a.getAttribute(h);e&&c.setAttribute(h,e),b.appendChild(c)}}function d(a,b){b=b||document,b=b.createElement?b:b.ownerDocument;var c=b.createElement("style");return c.textContent=a,c}function e(a){return a&&a.__resource||""}function f(a,b){return p?p.call(a,b):void 0}var g=(window.logFlags||{},a.api.instance.styles),h=g.STYLE_SCOPE_ATTRIBUTE,i="style",j="@import",k="link[rel=stylesheet]",l="global",m="polymer-scope",n={loadStyles:function(a){var b=this.templateContent();b&&this.convertSheetsToStyles(b);var c=this.findLoadableStyles(b);c.length?Platform.styleResolver.loadStyles(c,a):a&&a()},convertSheetsToStyles:function(a){for(var c,e,f=a.querySelectorAll(k),g=0,h=f.length;h>g&&(c=f[g]);g++)e=d(b(c,this.ownerDocument.baseURI),this.ownerDocument),this.copySheetAttributes(e,c),c.parentNode.replaceChild(e,c)},copySheetAttributes:function(a,b){for(var c,d=0,e=b.attributes,f=e.length;(c=e[d])&&f>d;d++)"rel"!==c.name&&"href"!==c.name&&a.setAttribute(c.name,c.value)},findLoadableStyles:function(a){var b=[];if(a)for(var c,d=a.querySelectorAll(i),e=0,f=d.length;f>e&&(c=d[e]);e++)c.textContent.match(j)&&b.push(c);return b},installSheets:function(){this.cacheSheets(),this.cacheStyles(),this.installLocalSheets(),this.installGlobalStyles()},cacheSheets:function(){this.sheets=this.findNodes(k),this.sheets.forEach(function(a){a.parentNode&&a.parentNode.removeChild(a)})},cacheStyles:function(){this.styles=this.findNodes(i+"["+m+"]"),this.styles.forEach(function(a){a.parentNode&&a.parentNode.removeChild(a)})},installLocalSheets:function(){var a=this.sheets.filter(function(a){return!a.hasAttribute(m)}),b=this.templateContent();if(b){var c="";if(a.forEach(function(a){c+=e(a)+"\n"}),c){var f=d(c,this.ownerDocument);b.insertBefore(f,b.firstChild)}}},findNodes:function(a,b){var c=this.querySelectorAll(a).array(),d=this.templateContent();if(d){var e=d.querySelectorAll(a).array();c=c.concat(e)}return b?c.filter(b):c},templateContent:function(){var a=this.querySelector("template");return a&&templateContent(a)},installGlobalStyles:function(){var a=this.styleForScope(l);c(a,document.head)},cssTextForScope:function(a){var b="",c="["+m+"="+a+"]",d=function(a){return f(a,c)},g=this.sheets.filter(d);g.forEach(function(a){b+=e(a)+"\n\n"});var h=this.styles.filter(d);return h.forEach(function(a){b+=a.textContent+"\n\n"}),b},styleForScope:function(a){var b=this.cssTextForScope(a);return this.cssTextToScopeStyle(b,a)},cssTextToScopeStyle:function(a,b){if(a){var c=d(a);return c.setAttribute(h,this.getAttribute("name")+"-"+b),c}}},o=HTMLElement.prototype,p=o.matches||o.matchesSelector||o.webkitMatchesSelector||o.mozMatchesSelector;a.api.declaration.styles=n,a.applyStyleToScope=c}(Polymer),function(a){var b=(window.logFlags||{},a.api.instance.events),c=b.EVENT_PREFIX,d={parseHostEvents:function(){var a=this.prototype.eventDelegates;this.addAttributeDelegates(a)},addAttributeDelegates:function(a){for(var b,c=0;b=this.attributes[c];c++)this.hasEventPrefix(b.name)&&(a[this.removeEventPrefix(b.name)]=b.value.replace("{{","").replace("}}","").trim())},hasEventPrefix:function(a){return a&&"o"===a[0]&&"n"===a[1]&&"-"===a[2]},removeEventPrefix:function(a){return a.slice(e)}},e=c.length;a.api.declaration.events=d}(Polymer),function(a){var b={inferObservers:function(a){var b,c=a.observe;for(var d in a)"Changed"===d.slice(-7)&&(c||(c=a.observe={}),b=d.slice(0,-7),c[b]=c[b]||d)},explodeObservers:function(a){var b=a.observe;if(b){var c={};for(var d in b)for(var e,f=d.split(" "),g=0;e=f[g];g++)c[e]=b[d];a.observe=c}},optimizePropertyMaps:function(a){if(a.observe){var b=a._observeNames=[];for(var c in a.observe)for(var d,e=c.split(" "),f=0;d=e[f];f++)b.push(d)}if(a.publish){var b=a._publishNames=[];for(var c in a.publish)b.push(c)}},publishProperties:function(a,b){var c=a.publish;c&&(this.requireProperties(c,a,b),a._publishLC=this.lowerCaseMap(c))},requireProperties:function(a,b,c){for(var d in a)void 0===b[d]&&void 0===c[d]&&(b[d]=a[d])},lowerCaseMap:function(a){var b={};for(var c in a)b[c.toLowerCase()]=c;return b}};a.api.declaration.properties=b}(Polymer),function(a){var b="attributes",c=/\s|,/,d={inheritAttributesObjects:function(a){this.inheritObject(a,"publishLC"),this.inheritObject(a,"_instanceAttributes")},publishAttributes:function(a,d){var e=this.getAttribute(b);if(e)for(var f,g=a.publish||(a.publish={}),h=e.split(c),i=0,j=h.length;j>i;i++)f=h[i].trim(),f&&void 0===g[f]&&void 0===d[f]&&(g[f]=null)},accumulateInstanceAttributes:function(){for(var a,b=this.prototype._instanceAttributes,c=this.attributes,d=0,e=c.length;e>d&&(a=c[d]);d++)this.isInstanceAttribute(a.name)&&(b[a.name]=a.value)},isInstanceAttribute:function(a){return!this.blackList[a]&&"on-"!==a.slice(0,3)},blackList:{name:1,"extends":1,constructor:1,noscript:1,assetpath:1,"cache-csstext":1}};d.blackList[b]=1,a.api.declaration.attributes=d}(Polymer),function(a){function b(a){if(!Object.__proto__){var b=Object.getPrototypeOf(a);a.__proto__=b,d(b)&&(b.__proto__=Object.getPrototypeOf(b))}}var c=a.api,d=a.isBase,e=a.extend,f={register:function(a,b){this.buildPrototype(a,b),this.registerPrototype(a,b),this.publishConstructor()},buildPrototype:function(b,c){var d=a.getRegisteredPrototype(b),e=this.generateBasePrototype(c);this.desugarBeforeChaining(d,e),this.prototype=this.chainPrototypes(d,e),this.desugarAfterChaining(b,c)},desugarBeforeChaining:function(a,b){a.element=this,this.publishAttributes(a,b),this.publishProperties(a,b),this.inferObservers(a),this.explodeObservers(a)},chainPrototypes:function(a,c){this.inheritMetaData(a,c);var d=this.chainObject(a,c);return b(d),d},inheritMetaData:function(a,b){this.inheritObject("observe",a,b),this.inheritObject("publish",a,b),this.inheritObject("_publishLC",a,b),this.inheritObject("_instanceAttributes",a,b),this.inheritObject("eventDelegates",a,b)},desugarAfterChaining:function(a,b){this.optimizePropertyMaps(this.prototype),this.installSheets(),this.resolveElementPaths(this),this.accumulateInstanceAttributes(),this.parseHostEvents(),this.addResolvePathApi(),window.ShadowDOMPolyfill&&Platform.ShadowCSS.shimStyling(this.templateContent(),a,b),this.prototype.registerCallback&&this.prototype.registerCallback(this)},publishConstructor:function(){var a=this.getAttribute("constructor");a&&(window[a]=this.ctor)},generateBasePrototype:function(a){var b=this.findBasePrototype(a);if(!b){var b=HTMLElement.getPrototypeForTag(a);b=this.ensureBaseApi(b),g[a]=b}return b},findBasePrototype:function(a){return g[a]},ensureBaseApi:function(a){if(a.PolymerBase)return a;var b=Object.create(a);return c.publish(c.instance,b),this.mixinMethod(b,a,c.instance.mdv,"bind"),b},mixinMethod:function(a,b,c,d){var e=function(a){return b[d].apply(this,a)};a[d]=function(){return this.mixinSuper=e,c[d].apply(this,arguments)}},inheritObject:function(a,b,c){var d=b[a]||{};b[a]=this.chainObject(d,c[a])},registerPrototype:function(a,b){var c={prototype:this.prototype},d=this.findTypeExtension(b);d&&(c.extends=d),HTMLElement.register(a,this.prototype),this.ctor=document.registerElement(a,c)},findTypeExtension:function(a){if(a&&a.indexOf("-")<0)return a;var b=this.findBasePrototype(a);return b.element?this.findTypeExtension(b.element.extends):void 0}},g={};f.chainObject=Object.__proto__?function(a,b){return a&&b&&a!==b&&(a.__proto__=b),a}:function(a,b){if(a&&b&&a!==b){var c=Object.create(b);a=e(c,a)}return a},c.declaration.prototype=f}(Polymer),function(a){function b(a){return document.contains(a)?g:f}function c(){return f.length?f[0]:g[0]}function d(a){e.waitToReady=!0,CustomElements.ready=!1,HTMLImports.whenImportsReady(function(){e.addReadyCallback(a),e.waitToReady=!1,e.check()})}var e={wait:function(a,b,c){return-1===this.indexOf(a)&&(this.add(a),a.__check=b,a.__go=c),0!==this.indexOf(a)},add:function(a){b(a).push(a)},indexOf:function(a){var c=b(a).indexOf(a);return c>=0&&document.contains(a)&&(c+=HTMLImports.useNative||HTMLImports.ready?f.length:1e9),c},go:function(a){var b=this.remove(a);b&&(b.__go.call(b),b.__check=b.__go=null,this.check())},remove:function(a){var c=this.indexOf(a);if(0===c)return b(a).shift()},check:function(){var a=this.nextElement();return a&&a.__check.call(a),this.canReady()?(this.ready(),!0):void 0},nextElement:function(){return c()},canReady:function(){return!this.waitToReady&&this.isEmpty()},isEmpty:function(){return!f.length&&!g.length},ready:function(){if(CustomElements.ready===!1&&(CustomElements.upgradeDocumentTree(document),CustomElements.ready=!0),h)for(var a;h.length;)(a=h.shift())()},addReadyCallback:function(a){a&&h.push(a)},waitToReady:!0},f=[],g=[],h=[];document.addEventListener("WebComponentsReady",function(){CustomElements.ready=!1}),a.queue=e,a.whenPolymerReady=d}(Polymer),function(a){function b(a,b){a?(document.head.appendChild(a),d(b)):b&&b()}function c(a,c){if(a&&a.length){for(var d,e,f=document.createDocumentFragment(),g=0,h=a.length;h>g&&(d=a[g]);g++)e=document.createElement("link"),e.rel="import",e.href=d,f.appendChild(e);b(f,c)}else c&&c()}var d=a.whenPolymerReady;a.import=c,a.importElements=b}(Polymer),function(a){function b(a){return Boolean(HTMLElement.getPrototypeForTag(a))}function c(a){return a&&a.indexOf("-")>=0}var d=a.extend,e=a.api,f=a.queue,g=a.whenPolymerReady,h=a.getRegisteredPrototype,i=a.waitingForPrototype,j=d(Object.create(HTMLElement.prototype),{createdCallback:function(){this.getAttribute("name")&&this.init()},init:function(){this.name=this.getAttribute("name"),this.extends=this.getAttribute("extends"),this.loadResources(),this.registerWhenReady()},registerWhenReady:function(){this.registered||this.waitingForPrototype(this.name)||this.waitingForQueue()||this.waitingForResources()||f.go(this)},_register:function(){c(this.extends)&&!b(this.extends)&&console.warn("%s is attempting to extend %s, an unregistered element or one that was not registered with Polymer.",this.name,this.extends),this.register(this.name,this.extends),this.registered=!0},waitingForPrototype:function(a){return h(a)?void 0:(i(a,this),this.handleNoScript(a),!0)},handleNoScript:function(a){if(this.hasAttribute("noscript")&&!this.noscript)if(this.noscript=!0,window.CustomElements&&!CustomElements.useNative)Polymer(a);else{var b=document.createElement("script");b.textContent="Polymer('"+a+"');",this.appendChild(b)}},waitingForResources:function(){return this._needsResources},waitingForQueue:function(){return f.wait(this,this.registerWhenReady,this._register)},loadResources:function(){this._needsResources=!0,this.loadStyles(function(){this._needsResources=!1,this.registerWhenReady()}.bind(this))}});e.publish(e.declaration,j),a.getRegisteredPrototype=h,g(function(){document.body.removeAttribute("unresolved"),document.dispatchEvent(new CustomEvent("polymer-ready",{bubbles:!0}))}),document.registerElement("polymer-element",{prototype:j})}(Polymer);
-//# sourceMappingURL=polymer.js.map
-</script>
-<!-- <link rel="import" href="../polymer-dev/polymer.html"> -->
+<!--
+ Copyright 2013 The Polymer Authors. All rights reserved.
+ Use of this source code is governed by a BSD-style
+ license that can be found in the LICENSE file.
+-->
+<!--<script src="polymer.js"></script>-->
+  
 
 <!--
 Copyright 2013 The Polymer Authors. All rights reserved.
@@ -208,9 +2653,9 @@ license that can be found in the LICENSE file.
   flex: 1;
 }
 
-::content(.flex), 
-::content([flex]),
-::content([fit]) {
+content /content/ .flex, 
+content /content/ [flex],
+content /content/ [fit] {
   -webkit-box-flex: 1;
   -ms-flex: 1;
   -moz-flex: 1;
@@ -391,9 +2836,9 @@ license that can be found in the LICENSE file.
   flex: 1;
 }
 
-::content(.flex), 
-::content([flex]),
-::content([fit]) {
+content /content/ .flex, 
+content /content/ [flex],
+content /content/ [fit] {
   -webkit-box-flex: 1;
   -ms-flex: 1;
   -moz-flex: 1;
@@ -1126,7 +3571,7 @@ license that can be found in the LICENSE file.
 
 
 
-<polymer-element name="polymer-selector" attributes="selected multi valueattr selectedClass selectedProperty selectedAttribute selectedItem selectedModel selectedIndex notap target itemsSelector activateEvent" assetpath="../polymer-selector/">
+<polymer-element name="polymer-selector" attributes="selected multi valueattr selectedClass selectedProperty selectedItem selectedModel selectedIndex notap target itemsSelector activateEvent" assetpath="../polymer-selector/">
   <template>
     <polymer-selection id="selection" multi="{{multi}}" on-polymer-select="{{selectionSelect}}"></polymer-selection>
     <content id="items" select="*"></content>
@@ -1195,18 +3640,9 @@ license that can be found in the LICENSE file.
        *
        * @attribute selectedProperty
        * @type string
-       * @default ''
-       */
-      selectedProperty: '',
-      /**
-       * Specifies the property to be used to set on the selected element
-       * to indicate its active state.
-       *
-       * @attribute selectedProperty
-       * @type string
        * @default 'active'
        */
-      selectedAttribute: 'active',
+      selectedProperty: 'active',
       /**
        * Returns the currently selected element. In multi-selection this returns
        * an array of selected elements.
@@ -1381,13 +3817,6 @@ license that can be found in the LICENSE file.
         }
         if (this.selectedProperty) {
           item[this.selectedProperty] = isSelected;
-        }
-        if (this.selectedAttribute && item.setAttribute) {
-          if (isSelected) {
-            item.setAttribute(this.selectedAttribute, '');
-          } else {
-            item.removeAttribute(this.selectedAttribute);
-          }
         }
       },
       // event fired from host
@@ -2107,7 +4536,7 @@ polymer-ui-icon {
 }
 
 /*@polyfill :host #label > a, #link */
-::content > a, #link {
+content /content/ a, #link {
   position: absolute;
   top: 0;
   right: 0;
@@ -2677,22 +5106,22 @@ license that can be found in the LICENSE file.
 /* TODO(sorvell): use of !important due to inability to 
   naturally win over an :host style */
 /*@polyfill :host > polymer-ui-icon-button */
-::content > polymer-ui-icon-button {
+content /content/ polymer-ui-icon-button {
   margin: 0px 8px 0 8px !important;
 }
 
 /*@polyfill :host > polymer-ui-menu-button */
-::content > polymer-ui-menu-button {
+content /content/ polymer-ui-menu-button {
   margin: 0px 8px 0 8px !important;
 }
 
 /*@polyfill :host > polymer-ui-toolbar */
-::content > polymer-ui-toolbar {
+content /content/ polymer-ui-toolbar {
   margin: 0;
 }
 
 /*@polyfill :host > polymer-ui-toolbar:not(.narrow-layout) */
-::content > polymer-ui-toolbar:not(.narrow-layout) {
+content /content/ polymer-ui-toolbar:not(.narrow-layout) {
   border: 0;
   background: transparent none;
 }
@@ -2863,8 +5292,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
  * @group Polymer Core Elements
  *
  * core-xhr can be used to perform XMLHttpRequests.
- 
- * Example:
  *
  *     <core-xhr id="xhr"></core-xhr>
  *     ...
@@ -2925,12 +5352,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
        * @param {Object} inOptions
        *    @param {String} inOptions.url The url to which the request is sent.
        *    @param {String} inOptions.method The HTTP method to use, default is GET.
-       *    @param {boolean} inOptions.sync By default, all requests are sent asynchronously.
-       *        To send synchronous requests, set to true.
+       *    @param {boolean} inOptions.sync By default, all requests are sent asynchronously. To send synchronous requests, set to true.
        *    @param {Object} inOptions.params Data to be sent to the server.
        *    @param {Object} inOptions.body The content for the request body for POST method.
        *    @param {Object} inOptions.headers HTTP request headers.
        *    @param {String} inOptions.responseType The response type. Default is 'text'.
+       *    @param {boolean} inOptions.withCredentials Whether or not to send credentials on the request. Default is false.
        *    @param {Object} inOptions.callback Called when request is completed.
        * @returns {Object} XHR object.
        */
@@ -2946,6 +5373,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         xhr.open(method, url, async);
         if (options.responseType) {
           xhr.responseType = options.responseType;
+        }
+        if (options.withCredentials) {
+          xhr.withCredentials = true;
         }
         this.makeReadyStateHandler(xhr, options.callback);
         this.setRequestHeaders(xhr, options.headers);
@@ -2974,24 +5404,22 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 /**
  * @group Polymer Core Elements
  *
- * The `core-ajax` element performs `XMLHttpRequest`s.
- * 
- * You can trigger a request explicitly by calling `go` on the
- * element. 
+ * The `core-ajax` element exposes `XMLHttpRequest` functionality.
+ *
+ *     <core-ajax 
+ *         auto 
+ *         url="http://gdata.youtube.com/feeds/api/videos/" 
+ *         params='{"alt":"json", "q":"chrome"}'
+ *         handleAs="json"
+ *         on-core-response="{{handleResponse}}"></core-ajax>
  * 
  * With `auto` set to `true`, the element performs a request whenever
  * its `url` or `params` properties are changed.
- * 
  *
- * Example:
- *
- *     <core-ajax auto url="http://gdata.youtube.com/feeds/api/videos/" 
- *         params='{"alt":"json", "q":"chrome"}'
- *         handleAs="json"
- *         on-core-response="{{handleResponse}}">
- *     </core-ajax>
- * 
  * Note: The `params` attribute must be double quoted JSON.
+ *
+ * You can trigger a request explicitly by calling `go` on the
+ * element.
  *
  * @element core-ajax
  * @status beta
@@ -3021,7 +5449,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 
 
-<polymer-element name="core-ajax" attributes="url handleAs auto params response method headers body contentType" assetpath="../core-ajax/">
+<polymer-element name="core-ajax" attributes="url handleAs auto params response method headers body contentType withCredentials" assetpath="../core-ajax/">
 
   <script>
 
@@ -3096,11 +5524,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
        *
        * Example:
        *
-       *     <core-ajax auto url="http://somesite.com"
+       *     <core-ajax 
+       *         auto
+       *         url="http://somesite.com"
        *         headers='{"X-Requested-With": "XMLHttpRequest"}'
        *         handleAs="json"
-       *         on-core-response="{{handleResponse}}">
-       *     </core-ajax>
+       *         on-core-response="{{handleResponse}}"></core-ajax>
        *  
        * @attribute headers
        * @type Object
@@ -3131,7 +5560,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
        * @default 'application/x-www-form-urlencoded'
        */
       contentType: 'application/x-www-form-urlencoded',
-
+      /**
+       * Set the withCredentials flag on the request.
+       * 
+       * @attribute withCredentials
+       * @type boolean
+       * @default false
+       */
+      withCredentials: false,
+      
       ready: function() {
         this.xhr = document.createElement('core-xhr');
       },
@@ -3237,6 +5674,8 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
         if (this.contentType) {
           args.headers['content-type'] = this.contentType;
         }
+        
+        args.withCredentials = this.withCredentials;
         args.callback = this.receive.bind(this);
         args.url = this.url;
         args.method = this.method;
@@ -3268,37 +5707,33 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
       textChanged: function() {
 
         if (!this.text) {
-          //console.log('textChanged:', this.text);
           return;
         }
 
         var text = this.text;
-
         var top = {};
         var classes = [];
         var current = top;
         var subCurrent = {};
 
-        function makePragma(object, pragma, content) {
-          var p$ = object;
-          var p = p$[pragma];
-          if (!p) {
-            p$[pragma] = p = [];
-          }
-          p.push(content);
-        }
+        var scriptDocCommentClause = '\\/\\*\\*([\\s\\S]*?)\\*\\/';
+        var htmlDocCommentClause = '<!--([\\s\\S]*?)-->';
 
-        var js_matches = text.match(/\/\*\*([\s\S]*?)\*\//g) || [];
-        text = text.replace(/\/\*\*([\s\S]*?)\*\//g, '');
+        // matches text between /** and */ inclusive and <!-- and --> inclusive
+        var docCommentRegex = new RegExp(scriptDocCommentClause + '|' + htmlDocCommentClause, 'g');
 
-        var html_matches = text.match(/<!--([\s\S]*?)-->/g) || [];
-        var matches = html_matches.concat(js_matches);
+        // acquire all script doc comments
+        var docComments = text.match(docCommentRegex) || [];
 
-        matches.forEach(function(m) {
-
+        // each match represents a single block of doc comments
+        docComments.forEach(function(m) {
+          // unify line ends, remove all comment characters, split into individual lines
           var lines = m.replace(/\r\n/g, '\n').replace(/^\s*\/\*\*|^\s*\*\/|^\s*\* ?|^\s*\<\!-\-|^s*\-\-\>/gm, '').split('\n');
 
+          // pragmas (@-rules) must occur on a line by themselves
           var pragmas = [];
+          // filter lines whose first non-whitespace character is @ into the pragma list
+          // (and out of the `lines` array)
           lines = lines.filter(function(l) {
             var m = l.match(/\s*@([\w-]*) (.*)/);
             if (!m) {
@@ -3307,6 +5742,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
             pragmas.push(m);
           });
 
+          // collect all other text into a single block
           var code = lines.join('\n');
           
           pragmas.forEach(function(m) {
@@ -3335,15 +5771,24 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
               case 'default':
               case 'type':
                 subCurrent[pragma] = content;
-                //makePragma(subCurrent, pragma, content);
                 break;
 
               default:
                 current[pragma] = content;
-                //makePragma(current, pragma, content);
                 break;
             }
           });
+
+          // utility function, yay hoisting
+          function makePragma(object, pragma, content) {
+            var p$ = object;
+            var p = p$[pragma];
+            if (!p) {
+              p$[pragma] = p = [];
+            }
+            p.push(content);
+          }
+
         });
 
         if (classes.length === 0) {
@@ -4670,9 +7115,7 @@ Displays YUIDoc formatted source documentation scraped from input urls.
 
 @class core-doc-viewer
 -->
-
 <polymer-element name="core-doc-viewer" attributes="url href sources" assetpath="../core-doc-viewer/">
-
 <!--
 
 Set url to add documentation from that location to the view.
@@ -5075,10 +7518,8 @@ a {
 
       </div>
     </div>
-
   </template>
   <script>
-
     Polymer('core-doc-viewer', {
       sources: [],
       data: null,
@@ -5096,15 +7537,11 @@ a {
         this.classes = [];
         // TODO(sjmiles): manual because flatiron-director didn't work, find out why
         window.addEventListener('hashchange', this.parseLocationHash.bind(this));
+        this.parseLocationHash();
         // TODO(sjmiles): improve method of configuring grid
         this.$.grid.nodes = [this.$.navigation, this.$.docs];
         this.$.grid.layout = this.layouts.open;
-        //this.onMutation(this.$.docs, this.docsNodeChanged);
-        // TODO(sjmiles): start observing DOM
-        this.docsNodeChanged();
-      },
-      attached: function() {
-        this.parseLocationHash();
+        this.onMutation(this.$.docs, this.docsNodeChanged);
       },
       parseLocationHash: function() {
         this.route = window.location.hash.slice(1);
@@ -5172,9 +7609,7 @@ a {
         });
       }
     });
-
   </script>
-
 </polymer-element>
 
 ﻿<!--
