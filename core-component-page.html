@@ -688,918 +688,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 </script>
 </polymer-element>
 
-
-
-<polymer-element name="core-layout-grid" attributes="nodes layout auto" assetpath="../core-layout-grid/">
-<script>
-  (function() {
-
-    Polymer('core-layout-grid', {
-
-      nodes: null,
-      layout: null,
-      auto: false,
-
-      created: function() {
-        this.layout = [];
-      },
-
-      nodesChanged: function() {
-        this.invalidate();
-      },
-
-      layoutChanged: function() {
-        this.invalidate();
-      },
-
-      autoNodes: function() {
-        this.nodes = this.parentNode.children.array().filter(
-          function(node) {
-            switch(node.localName) {
-              case 'core-layout-grid':
-              case 'style':
-                return false;
-            }
-            return true;
-          }
-        );
-      },
-
-      invalidate: function() {
-        if (this.layout && this.layout.length) {
-          // job debounces layout, only letting it occur every N ms
-          this.layoutJob = this.job(this.layoutJob, this.relayout);
-        }
-      },
-
-      relayout: function() {
-        if (!this.nodes || this.auto) {
-          this.autoNodes();
-        }
-        layout(this.layout, this.nodes);
-        this.asyncFire('core-layout');
-      }
-
-    });
-
-    //
-
-    var lineParent;
-
-    function line(axis, p, d) {
-      var l = document.createElement('line');
-      var extent = (axis === 'left' ? 'width' : 
-        (axis === 'top' ? 'height' : axis));
-      l.setAttribute('extent', extent);
-      if (d < 0) {
-        axis = (axis === 'left' ? 'right' : 
-          (axis === 'top' ? 'bottom' : axis));
-      }
-      p = Math.abs(p);
-      l.style[axis] = p + 'px';
-      l.style[extent] = '0px';
-      lineParent.appendChild(l);
-    }
-
-    var colCount, colOwners, rowCount, rowOwners;
-
-    function matrixillate(matrix) {
-      // mesaure the matrix, must be rectangular
-      rowCount = matrix.length;
-      colCount = rowCount && matrix[0].length || 0;
-      // transpose matrix
-      var transpose = [];
-      for (var i=0; i<colCount; i++) {
-        var c = [];
-        for (var j=0; j<rowCount; j++) {
-          c.push(matrix[j][i]);
-        }
-        transpose.push(c);
-      }
-      // assign sizing control
-      colOwners = findOwners(matrix);
-      rowOwners = findOwners(transpose);
-      //console.log('colOwners', colOwners);
-      //console.log('rowOwners', rowOwners);
-    }
-
-    function findOwners(matrix) {
-      var majCount = matrix.length;
-      var minCount = majCount && matrix[0].length || 0;
-      var owners = [];
-      // for each column (e.g.)
-      for (var i=0; i<minCount; i++) {
-        // array of contained areas
-        var contained = {};
-        // look at each row to find a containing area
-        for (var j=0; j<majCount; j++) {
-          // get the row vector
-          var vector = matrix[j]
-          // node index at [i,j]
-          var nodei = vector[i];
-          // if a node is there
-          if (nodei) {
-            // determine if it bounds this column
-            var owns = false;
-            if (i === 0) {
-              owns = (i === minCount-1) || (nodei !== vector[i+1]);
-            } else if (i === minCount - 1) {
-              owns = (i === 0) || (nodei !== vector[i-1]);
-            } else {
-              owns = nodei !== vector[i-1] && nodei !== vector[i+1];
-            }
-            if (owns) {
-              contained[nodei] = 1;
-            }
-          }
-          // store the owners for this column
-          owners[i] = contained;
-        }
-      }
-      return owners;
-    }
-
-    var nodes;
-
-    function colWidth(i) {
-      for (var col in colOwners[i]) {
-        col = Number(col);
-        if (col === 0) {
-          return 96;
-        }
-        var node = nodes[col - 1];
-        if (node.hasAttribute('h-flex') || node.hasAttribute('flex')) {
-          return -1;
-        }
-        var w = node.offsetWidth;
-        //console.log('colWidth(' + i + ') ==', w);
-        return w;
-      }
-      return -1;
-    }
-
-    function rowHeight(i) {
-      for (var row in rowOwners[i]) {
-        row = Number(row);
-        if (row === 0) {
-          return 96;
-        }
-        var node = nodes[row - 1];
-        if (node.hasAttribute('v-flex') || node.hasAttribute('flex')) {
-          return -1;
-        }
-        var h = node.offsetHeight;
-        //console.log('rowHeight(' + i + ') ==', h);
-        return h;
-      }
-      return -1;
-    }
-
-    var m = 0;
-
-    function railize(count, sizeFn) {
-      //
-      // create rails for `count` tracks using 
-      // sizing function `sizeFn(trackNo)`
-      //
-      // for n tracks there are (n+1) rails
-      //
-      //   |track|track|track|
-      //  0|->sz0|->sz1|<-sz2|0
-      //
-      //   |track|track|track|
-      //  0|->sz0|     |<-sz2|0
-      //
-      // there can be one elastic track per set
-      //
-      //   |track|track|track|track|
-      //  0|-->s0|-->s1|<--s1|<--s2|0
-      //
-      // sz1 spans multiple  tracks which makes
-      // it elastic (it's underconstrained)
-      //
-      var rails = [];
-      var a = 0;
-      for (var i=0, x; i<count; i++) {
-        rails[i] = {p: a, s: 1};
-        x = sizeFn(i) + m + m;
-        if (x == -1) {
-          break;
-        }
-        a += x;
-      }
-      if (i === count) {
-        rails[i] = {p: 0, s: -1};
-      }
-      var b = 0;
-      for (var ii=count, x; ii>i; ii--) {
-        rails[ii] = {p: b, s: -1};
-        x = sizeFn(ii - 1) + m + m;
-        if (x !== -1) {
-          b += x;
-        }
-      }
-      return rails;
-    }
-
-    // TODO(sjmiles): this code tries to preserve actual position,
-    // so 'unposition' is really 'naturalize' or something
-    function unposition(box) {
-      var style = box.style;
-      //style.right = style.bottom = style.width = style.height = '';
-      style.position = 'absolute';
-      style.display = 'inline-block';
-      style.boxSizing = style.mozBoxSizing = 'border-box';
-    }
-
-    function _position(style, maj, min, ext, a, b) {
-      style[maj] = style[min] = '';
-      style[ext] = 'auto';
-      if (a.s < 0 && b.s < 0) {
-        var siz = a.p - b.p - m - m;
-        style[ext] = siz + 'px';
-        var c = 'calc(100% - ' + (b.p + siz + m) + 'px' + ')';
-        style[maj] = '-webkit-' + c;
-        style[maj] = c;
-      } else if (b.s < 0) {
-        style[maj] = a.p + m + 'px';
-        style[min] = b.p + m + 'px';
-      } else {
-        style[maj] = a.p + m + 'px';
-        style[ext] = b.p - a.p - m - m + 'px';
-      }
-    }
-
-    function position(elt, left, right, top, bottom) {
-      _position(elt.style, 'top', 'bottom', 'height', rows[top], 
-          rows[bottom]);
-      _position(elt.style, 'left', 'right', 'width', columns[left], 
-          columns[right]);
-    }
-
-    function layout(matrix, anodes, alineParent) {
-      //console.group('layout');
-
-      lineParent = alineParent;
-      nodes = anodes;
-      matrixillate(matrix);
-
-      nodes.forEach(unposition);
-
-      columns = railize(colCount, colWidth);
-      rows = railize(rowCount, rowHeight);
-
-      if (alineParent) {
-        //console.group('column rails');
-        columns.forEach(function(c) {
-          //console.log(c.p, c.s);
-          line('left', c.p, c.s);
-        });
-        //console.groupEnd();
-
-        //console.group('row rails');
-        rows.forEach(function(r) {
-          //console.log(r.p, r.s);
-          line('top', r.p, r.s);
-        });
-        //console.groupEnd();
-      }
-
-      //console.group('rail boundaries');
-      nodes.forEach(function(node, i) {
-        // node indices are 1-based
-        var n = i + 1;
-        // boundary rails
-        var l, r, t = 1e10, b = -1e10;
-        matrix.forEach(function(vector, i) {
-          var f = vector.indexOf(n);
-          if (f > -1) {
-            l = f;
-            r = vector.lastIndexOf(n) + 1;
-            t = Math.min(t, i);
-            b = Math.max(b, i) + 1;
-          }
-        });
-        if (l == undefined) {
-          //console.log('unused');
-          node.style.position = 'absolute';
-          var offscreen = node.getAttribute('offscreen');
-          switch (offscreen) {
-            case 'basement':
-              node.style.zIndex = 0;
-              break;
-            case 'left':
-            case 'top':
-              node.style[offscreen] = node.offsetWidth * -2 + 'px';
-              break;
-            case 'right':
-              node.style.left = node.offsetParent.offsetWidth 
-                  + node.offsetWidth + 'px';
-              break;
-            case 'bottom':
-              node.style.top = node.parentNode.offsetHeight 
-                  + node.offsetHeight + 'px';
-              break;
-            default:
-              node.style[Math.random() >= 0.5 ? 'left' : 'top'] = '-110%';
-          }
-          //node.style.opacity = 0;
-          node.style.pointerEvents = 'none';
-        } else {
-          node.style.pointerEvents = '';
-          //node.style.opacity = '';
-          //console.log(l, r, t, b);
-          position(node, l, r, t, b);
-        }
-      });
-      //console.groupEnd();
-      //console.groupEnd();
-    }
-
-  })();
-</script>
-</polymer-element>
-<!--
-Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
-This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
-The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
-The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
-Code distributed by Google as part of the polymer project is also
-subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
--->
-<!--
-/**
- * @group Polymer Core Elements
- *
- * The core-selection element is used to manage selection state. It has no
- * visual appearance and is typically used in conjuneciton with another element.
- * For example, <a href="core-selector.html">core-selector</a>
- * use a core-selection to manage selection.
- *
- * To mark an item as selected, call the select(item) method on 
- * core-selection. Notice that the item itself is an argument to this method.
- * The core-selection element manages selection state for any given set of
- * items. When an item is selected, the `core-select` event is fired.
- * The attribute "multi" indicates if multiple items can be selected at once.
- * 
- * Example:
- *
- *     <core-element name="selection-example">
- *        <template>
- *          <style>
- *            ::-webkit-distributed(> .selected) {
- *              font-weight: bold;
- *              font-style: italic;
- *            }
- *          </style>
- *          <ul on-tap="{{itemTapAction}}">
- *            <content></content>
- *          </ul>
- *          <core-selection id="selection" multi on-core-select="{{selectAction}}"></core-selection>
- *        </template>
- *        <script>
- *          Polymer('selection-example', {
- *            itemTapAction: function(e) {
- *              this.$.selection.select(e.target);
- *            },
- *            selectAction: function(e, detail) {
- *              detail.item.classList.toggle('selected', detail.isSelected);
- *            }
- *          });
- *        </script>
- *     </core-element>
- *
- *     <selection-example>
- *       <li>Red</li>
- *       <li>Green</li>
- *       <li>Blue</li>
- *     </selection-example>
- *
- * @element core-selection
- */
- /**
- * Fired when an item's selection state is changed. This event is fired both
- * when an item is selected or deselected. The `isSelected` detail property
- * contains the selection state.
- * 
- * @event core-select
- * @param {Object} detail
- *   @param {boolean} detail.isSelected true for selection and false for deselection
- *   @param {Object} detail.item the item element
- */
--->
-
-
-<polymer-element name="core-selection" attributes="multi" assetpath="../core-selection/">
-  <template>
-    <style>
-      :host {
-        display: none !important;
-      }
-    </style>
-  </template>
-  <script>
-    Polymer('core-selection', {
-      /**
-       * If true, multiple selections are allowed.
-       *
-       * @attribute multi
-       * @type boolean
-       * @default false
-       */
-      multi: false,
-      ready: function() {
-        this.clear();
-      },
-      clear: function() {
-        this.selection = [];
-      },
-      /**
-       * Retrieves the selected item(s).
-       * @method getSelection
-       * @returns Returns the selected item(s). If the multi property is true,
-       * getSelection will return an array, otherwise it will return 
-       * the selected item or undefined if there is no selection.
-      */
-      getSelection: function() {
-        return this.multi ? this.selection : this.selection[0];
-      },
-      /**
-       * Indicates if a given item is selected.
-       * @method isSelected
-       * @param {any} item The item whose selection state should be checked.
-       * @returns Returns true if `item` is selected.
-      */
-      isSelected: function(item) {
-        return this.selection.indexOf(item) >= 0;
-      },
-      setItemSelected: function(item, isSelected) {
-        if (item !== undefined && item !== null) {
-          if (isSelected) {
-            this.selection.push(item);
-          } else {
-            var i = this.selection.indexOf(item);
-            if (i >= 0) {
-              this.selection.splice(i, 1);
-            }
-          }
-          this.fire("core-select", {isSelected: isSelected, item: item});
-        }
-      },
-      /**
-       * Set the selection state for a given `item`. If the multi property
-       * is true, then the selected state of `item` will be toggled; otherwise
-       * the `item` will be selected.
-       * @method select
-       * @param {any} item: The item to select.
-      */
-      select: function(item) {
-        if (this.multi) {
-          this.toggle(item);
-        } else if (this.getSelection() !== item) {
-          this.setItemSelected(this.getSelection(), false);
-          this.setItemSelected(item, true);
-        }
-      },
-      /**
-       * Toggles the selection state for `item`.
-       * @method toggle
-       * @param {any} item: The item to toggle.
-      */
-      toggle: function(item) {
-        this.setItemSelected(item, !this.isSelected(item));
-      }
-    });
-  </script>
-</polymer-element>
-
-<!--
-Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
-This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
-The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
-The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
-Code distributed by Google as part of the polymer project is also
-subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
--->
-
-<!--
-/**
- * @group Polymer Core Elements
- */
-
-/**
- * core-selector is used to manage a list of elements that can be selected.
- * The attribute "selected" indicates which item element is being selected.
- * The attribute "multi" indicates if multiple items can be selected at once.
- * Tapping on the item element would fire "core-activate" event. Use
- * "core-select" event to listen for selection changes.
- *
- * Example:
- *
- *     <core-selector selected="0">
- *       <div>Item 1</div>
- *       <div>Item 2</div>
- *       <div>Item 3</div>
- *     </core-selector>
- *
- * core-selector is not styled.  So one needs to use "core-selected" CSS
- * class to style the selected element.
- * 
- *     <style>
- *       .item.core-selected {
- *         background: #eee;
- *       }
- *     </style>
- *     ...
- *     <core-selector>
- *       <div class="item">Item 1</div>
- *       <div class="item">Item 2</div>
- *       <div class="item">Item 3</div>
- *     </core-selector>
- *
- * @element core-selector
- * @status stable
- * @homepage github.io
- */
-
-/**
- * Fired when an item's selection state is changed. This event is fired both
- * when an item is selected or deselected. The `isSelected` detail property
- * contains the selection state.
- * 
- * @event core-select
- * @param {Object} detail
- *   @param {boolean} detail.isSelected true for selection and false for deselection
- *   @param {Object} detail.item the item element
- */
-
-/**
- * Fired when an item element is tapped.
- * 
- * @event core-activate
- * @param {Object} detail
- *   @param {Object} detail.item the item element
- */
--->
-
-
-
-
-<polymer-element name="core-selector" assetpath="../core-selector/">
-
-  <template>
-
-    <core-selection id="selection" multi="{{multi}}" on-core-select="{{selectionSelect}}"></core-selection>
-    <content id="items" select="*"></content>
-
-  </template>
-
-  <script>
-
-    Polymer('core-selector', {
-      publish: {
-        /**
-         * Gets or sets the selected element.  Default to use the index
-         * of the item element.
-         *
-         * If you want a specific attribute value of the element to be
-         * used instead of index, set "valueattr" to that attribute name.
-         *
-         * Example:
-         *
-         *     <core-selector valueattr="label" selected="foo">
-         *       <div label="foo"></div>
-         *       <div label="bar"></div>
-         *       <div label="zot"></div>
-         *     </core-selector>
-         *
-         * In multi-selection this should be an array of values.
-         *
-         * Example:
-         *
-         *     <core-selector id="selector" valueattr="label" multi>
-         *       <div label="foo"></div>
-         *       <div label="bar"></div>
-         *       <div label="zot"></div>
-         *     </core-selector>
-         *
-         *     this.$.selector.selected = ['foo', 'zot'];
-         *
-         * @attribute selected
-         * @type Object
-         * @default null
-         */
-        selected: -1,
-
-        /**
-         * If true, multiple selections are allowed.
-         *
-         * @attribute multi
-         * @type boolean
-         * @default false
-         */
-        multi: false,
-
-        /**
-         * Specifies the attribute to be used for "selected" attribute.
-         *
-         * @attribute valueattr
-         * @type string
-         * @default 'name'
-         */
-        valueattr: 'name',
-
-        /**
-         * Specifies the CSS class to be used to add to the selected element.
-         * 
-         * @attribute selectedClass
-         * @type string
-         * @default 'core-selected'
-         */
-        selectedClass: 'core-selected',
-
-        /**
-         * Specifies the property to be used to set on the selected element
-         * to indicate its active state.
-         *
-         * @attribute selectedProperty
-         * @type string
-         * @default ''
-         */
-        selectedProperty: '',
-
-        /**
-         * Specifies the property to be used to set on the selected element
-         * to indicate its active state.
-         *
-         * @attribute selectedProperty
-         * @type string
-         * @default 'active'
-         */
-        selectedAttribute: 'active',
-
-        /**
-         * Returns the currently selected element. In multi-selection this returns
-         * an array of selected elements.
-         * 
-         * @attribute selectedItem
-         * @type Object
-         * @default null
-         */
-        selectedItem: null,
-
-        /**
-         * In single selection, this returns the model associated with the
-         * selected element.
-         * 
-         * @attribute selectedModel
-         * @type Object
-         * @default null
-         */
-        selectedModel: null,
-
-        /**
-         * In single selection, this returns the selected index.
-         *
-         * @attribute selectedIndex
-         * @type number
-         * @default -1
-         */
-        selectedIndex: -1,
-
-        /**
-         * The target element that contains items.  If this is not set 
-         * core-selector is the container.
-         * 
-         * @attribute target
-         * @type Object
-         * @default null
-         */
-        target: null,
-
-        /**
-         * This can be used to query nodes from the target node to be used for 
-         * selection items.  Note this only works if the 'target' property is set.
-         *
-         * Example:
-         *
-         *     <core-selector target="{{$.myForm}}" itemsSelector="input[type=radio]"></core-selector>
-         *     <form id="myForm">
-         *       <label><input type="radio" name="color" value="red"> Red</label> <br>
-         *       <label><input type="radio" name="color" value="green"> Green</label> <br>
-         *       <label><input type="radio" name="color" value="blue"> Blue</label> <br>
-         *       <p>color = {{color}}</p>
-         *     </form>
-         * 
-         * @attribute itemSelector
-         * @type string
-         * @default ''
-         */
-        itemsSelector: '',
-
-        /**
-         * The event that would be fired from the item element to indicate
-         * it is being selected.
-         *
-         * @attribute activateEvent
-         * @type string
-         * @default 'tap'
-         */
-        activateEvent: 'tap',
-
-        /**
-         * Set this to true to disallow changing the selection via the
-         * `activateEvent`.
-         *
-         * @attribute notap
-         * @type boolean
-         * @default false
-         */
-        notap: false,
-      },
-
-      ready: function() {
-        this.activateListener = this.activateHandler.bind(this);
-        this.observer = new MutationObserver(this.updateSelected.bind(this));
-        if (!this.target) {
-          this.target = this;
-        }
-      },
-
-      get items() {
-        var nodes = this.target !== this ? (this.itemsSelector ? 
-            this.target.querySelectorAll(this.itemsSelector) : 
-                this.target.children) : this.$.items.getDistributedNodes();
-        return Array.prototype.filter.call(nodes || [], function(n) {
-          return n && n.localName !== 'template';
-        });
-      },
-
-      targetChanged: function(old) {
-        if (old) {
-          this.removeListener(old);
-          this.observer.disconnect();
-        }
-        if (this.target) {
-          this.addListener(this.target);
-          this.observer.observe(this.target, {childList: true});
-        }
-      },
-
-      addListener: function(node) {
-        node.addEventListener(this.activateEvent, this.activateListener);
-      },
-
-      removeListener: function(node) {
-        node.removeEventListener(this.activateEvent, this.activateListener);
-      },
-
-      get selection() {
-        return this.$.selection.getSelection();
-      },
-
-      selectedChanged: function() {
-        this.updateSelected();
-      },
-
-      updateSelected: function() {
-        this.validateSelected();
-        if (this.multi) {
-          this.clearSelection();
-          this.selected && this.selected.forEach(function(s) {
-            this.valueToSelection(s);
-          }, this);
-        } else {
-          this.valueToSelection(this.selected);
-        }
-      },
-
-      validateSelected: function() {
-        // convert to an array for multi-selection
-        if (this.multi && !Array.isArray(this.selected) && 
-            this.selected !== null && this.selected !== undefined) {
-          this.selected = [this.selected];
-        }
-      },
-
-      clearSelection: function() {
-        if (this.multi) {
-          this.selection.slice().forEach(function(s) {
-            this.$.selection.setItemSelected(s, false);
-          }, this);
-        } else {
-          this.$.selection.setItemSelected(this.selection, false);
-        }
-        this.selectedItem = null;
-        this.$.selection.clear();
-      },
-
-      valueToSelection: function(value) {
-        var item = (value === null || value === undefined) ? 
-            null : this.items[this.valueToIndex(value)];
-        this.$.selection.select(item);
-      },
-
-      updateSelectedItem: function() {
-        this.selectedItem = this.selection;
-      },
-
-      selectedItemChanged: function() {
-        if (this.selectedItem) {
-          var t = this.selectedItem.templateInstance;
-          this.selectedModel = t ? t.model : undefined;
-        } else {
-          this.selectedModel = null;
-        }
-        this.selectedIndex = this.selectedItem ? 
-            parseInt(this.valueToIndex(this.selected)) : -1;
-      },
-
-      valueToIndex: function(value) {
-        // find an item with value == value and return it's index
-        for (var i=0, items=this.items, c; (c=items[i]); i++) {
-          if (this.valueForNode(c) == value) {
-            return i;
-          }
-        }
-        // if no item found, the value itself is probably the index
-        return value;
-      },
-
-      valueForNode: function(node) {
-        return node[this.valueattr] || node.getAttribute(this.valueattr);
-      },
-
-      // events fired from <core-selection> object
-      selectionSelect: function(e, detail) {
-        this.updateSelectedItem();
-        if (detail.item) {
-          this.applySelection(detail.item, detail.isSelected);
-        }
-      },
-
-      applySelection: function(item, isSelected) {
-        if (this.selectedClass) {
-          item.classList.toggle(this.selectedClass, isSelected);
-        }
-        if (this.selectedProperty) {
-          item[this.selectedProperty] = isSelected;
-        }
-        if (this.selectedAttribute && item.setAttribute) {
-          if (isSelected) {
-            item.setAttribute(this.selectedAttribute, '');
-          } else {
-            item.removeAttribute(this.selectedAttribute);
-          }
-        }
-      },
-
-      // event fired from host
-      activateHandler: function(e) {
-        if (!this.notap) {
-          var i = this.findDistributedTarget(e.target, this.items);
-          if (i >= 0) {
-            var item = this.items[i];
-            var s = this.valueForNode(item) || i;
-            if (this.multi) {
-              if (this.selected) {
-                this.addRemoveSelected(s);
-              } else {
-                this.selected = [s];
-              }
-            } else {
-              this.selected = s;
-            }
-            this.asyncFire('core-activate', {item: item});
-          }
-        }
-      },
-
-      addRemoveSelected: function(value) {
-        var i = this.selected.indexOf(value);
-        if (i >= 0) {
-          this.selected.splice(i, 1);
-        } else {
-          this.selected.push(value);
-        }
-        this.valueToSelection(value);
-      },
-
-      findDistributedTarget: function(target, nodes) {
-        // find first ancestor of target (including itself) that
-        // is in nodes, if any
-        while (target && target != this) {
-          var i = Array.prototype.indexOf.call(nodes, target);
-          if (i >= 0) {
-            return i;
-          }
-          target = target.parentNode;
-        }
-      }
-    });
-  </script>
-</polymer-element>
-
 <!--
 Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
 This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
@@ -1806,116 +894,6 @@ Example:
 
   </script>
 
-</polymer-element>
-
-<!--
-Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
-This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
-The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
-The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
-Code distributed by Google as part of the polymer project is also
-subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
--->
-
-<!--
-`core-menu` is a theme-aware selector.
-
-    <core-menu selected="0">
-      <core-item icon="settings" label="Settings"></core-item>
-      <core-item icon="dialog" label="Dialog"></core-item>
-      <core-item icon="search" label="Search"></core-item>
-    </core-menu>
-
-The `selectedItem` property references the selected item.
-
-    <core-menu selected="0" selectedItem="{{item}}">
-      <core-item icon="settings" label="Settings"></core-item>
-      <core-item icon="dialog" label="Dialog"></core-item>
-      <core-item icon="search" label="Search"></core-item>
-    </core-menu>
-
-    <div>selected label: {{item.label}}</div>
-
-The `core-select` event signals selection change.
-
-    <core-menu selected="0" on-core-select="{{selectAction}}">
-      <core-item icon="settings" label="Settings"></core-item>
-      <core-item icon="dialog" label="Dialog"></core-item>
-      <core-item icon="search" label="Search"></core-item>
-    </core-menu>
-
-    ...
-
-    selectAction: function(e, detail) {
-      if (detail.isSelected) {
-        var selectedItem = detail.item;
-        ...
-      }
-    }
-
-@group Polymer Core Elements
-@element core-menu
-@extends core-selector
--->
-
-
-
-
-<polymer-element name="core-menu" extends="core-selector" attributes="theme" on-core-select="{{selectionChange}}" assetpath="../core-menu/">
-<template>
-
-  <style>/*
-Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
-This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
-The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
-The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
-Code distributed by Google as part of the polymer project is also
-subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
-*/
-
-:host {
-  display: block;
-  box-sizing: border-box;
-  -moz-box-sizing: border-box;
-  padding: 0.4em;
-  font-weight: bold;
-}
-
-:host(.core-light-theme) {
-  color: #333333;
-}
-
-:host(.core-dark-theme) {
-  background: -webkit-linear-gradient(-60deg, #3d3d3d, #353535);
-  background: -moz-linear-gradient(-60deg, #3d3d3d, #353535);
-  background: -ms-linear-gradient(-60deg, #3d3d3d, #353535);
-  color: #ededed;
-}
-</style>
-  <shadow></shadow>
-
-</template>
-<script>
-
-  Polymer('core-menu', Platform.mixin({
-
-    attached: function() {
-      this.validateTheme();
-    },
-
-    selectionChange: function(e, detail) {
-      if (detail.isSelected) {
-        var item = detail.item;
-        while (item.selectedItem) {
-          item = item.selectedItem;
-        }
-        this.selectedItem = item;
-      }
-    }
-
-  }, Polymer.ThemeAware));
-
-</script>
 </polymer-element>
 
 <!--
@@ -2508,195 +1486,6 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 <!--
 Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
-This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
-The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
-The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
-Code distributed by Google as part of the polymer project is also
-subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
--->
-
-<!--
-@group Polymer Core Elements
-
-core-item is a simple line-item object: a label and/or an icon that can also act as a link.
-
-Example:
-
-     <core-item icon="settings" label="Settings"></core-item>
-
-@element core-item
--->
-
-
-
-<polymer-element name="core-item" extends="core-theme-aware" attributes="src label icon item href" assetpath="../core-item/">
-<template>
-
-  <style>/*
-Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
-This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
-The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
-The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
-Code distributed by Google as part of the polymer project is also
-subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
-*/
-
-:host {
-  display: block;
-  position: relative;
-  box-sizing: border-box;
-  -moz-box-sizing: border-box;
-  height: 40px;
-  line-height: 35px;
-  font-size: 16px;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  white-space: nowrap;
-  cursor: pointer;
-  opacity: 0.5;
-}
-
-:host(:hover) {
-  opacity: 0.9;
-}
-
-:host(.core-selected, [active]) {
-  opacity: 1;
-}
-
-:host(.core-light-theme.core-selected, .core-light-theme[active]) {
-  background: #f2f2f2;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-}
-
-:host(.core-dark-theme) {
-  color: #b3b3b3;
-}
-	
-:host(.core-dark-theme:hover) {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-:host(.core-dark-theme.core-selected, .core-dark-theme[active]) {
-  background-color: #000;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.9);
-}
-
-:host([active].no-active-bg) {
-  background-color: transparent;
-  border: 1px solid transparent;
-}
-
-/* icon and label */
-
-core-icon:not([showing]) {
-  display: none !important;
-}
-
-core-icon {
-  vertical-align: middle;
-  margin-right: 16px;
-}
-
-#label {
-  vertical-align: middle;
-  padding-right: 20px;
-}
-
-/*@polyfill :host #label > a, #link */
-::content > a, #link {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  margin: -1px;
-}
-
-#link[hidden] {
-  display: none;
-}
-</style>
-
-  <core-icon src="{{src}}" icon="{{icon}}" showing?="{{icon || src}}"></core-icon>
-  <span id="label">{{label}}<content></content></span>
-  <a id="link" href="{{href}}" hidden?="{{!href}}"></a>
-
-</template>
-<script>
-
-  Polymer('core-item', {
-    /**
-      * The URL of an image for the icon.
-      *
-      * @attribute src
-      * @type string
-      * @default ''
-      */
-
-    /**
-      * Specifies the icon from the Polymer icon set.
-      *
-      * @attribute icon
-      * @type string
-      * @default ''
-      */
-
-    /**
-      * Specifies a link target.
-      *
-      * Example:
-      *
-      *     <core-item icon="favorite" label="Favorite" href="http://www.polymer-project.org/"></core-item>
-      *
-      * If you want more control on the link, e.g. specify the target for where to
-      * open the linked document, you can put &lt;a> directly inside the item.
-      *
-      * Example:
-      *
-      *     <core-item icon="favorite" label="Favorite">
-      *       <a href="http://www.polymer-project.org/" target="_self"></a>
-      *     </core-item>
-      *
-      * @attribute href
-      * @type string
-      * @default ''
-      */
-
-    /**
-      * Specifies the label for the menu item.
-      *
-      * @attribute label
-      * @type string
-      * @default ''
-      */
-    label: '',
-
-    // calc item's offset middle pos instead of using offsetTop/Height 
-    // directly which requires to wait for submenu's collapsing transition to 
-    // complete first before it can return the correct pos.
-    getOffsetMiddle: function() {
-      var p = this.parentNode;
-      if (p) {
-        var i = Array.prototype.indexOf.call(p.items, this);
-        var h = this.getItemHeight();
-        return i * h + h/2 + p.items[0].offsetTop;
-      }
-    },
-
-    getItemHeight: function() {
-      return this.offsetHeight;
-    }
-
-  });
-
-</script>
-</polymer-element>
-
-<!--
-Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
 This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE
 The complete set of authors may be found at http://polymer.github.io/AUTHORS
 The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS
@@ -2836,6 +1625,868 @@ core-icon {
 
       activeChanged: function() {
         this.classList.toggle('selected', this.active);
+      }
+
+    });
+
+  </script>
+
+</polymer-element>
+
+<!--
+Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+<!--
+/**
+ * @group Polymer Core Elements
+ * @element core-media-query
+ * @status beta
+ * @homepage github.io
+ *
+ * core-media-query can be used to data bind to a CSS media query.
+ * The "query" property is a bare CSS media query.
+ * The "queryMatches" property will be a boolean representing if the page matches that media query.
+ *
+ * core-media-query uses media query listeners to dynamically update the "queryMatches" property.
+ * A "core-media-change" event also fires when queryMatches changes.
+ *
+ * Example:
+ *
+ *      <core-media-query query="max-width: 640px" queryMatches="{{phoneScreen}}"></core-media-query>
+ *
+ */
+
+ /**
+  * Fired when the media query state changes
+  *
+  * @event core-media-change
+  */
+-->
+
+
+<polymer-element name="core-media-query" attributes="query queryMatches" assetpath="../core-media-query/">
+  <template>
+    <style>
+      :host {
+        display: none;
+      }
+    </style>
+  </template>
+  <script>
+    Polymer('core-media-query', {
+
+      /**
+       * The Boolean return value of the media query
+       *
+       * @attribute queryMatches
+       * @type Boolean
+       * @default false
+       */
+      queryMatches: false,
+
+      /**
+       * The CSS media query to evaulate
+       *
+       * @attribute query
+       * @type string
+       * @default ''
+       */
+      query: '',
+      ready: function() {
+        this._mqHandler = this.queryHandler.bind(this);
+        this._mq = null;
+      },
+      queryChanged: function() {
+        if (this._mq) {
+          this._mq.removeListener(this._mqHandler);
+        }
+        var query = this.query;
+        if (query[0] !== '(') {
+          query = '(' + this.query + ')';
+        }
+        this._mq = window.matchMedia(query);
+        this._mq.addListener(this._mqHandler);
+        this.queryHandler(this._mq);
+      },
+      queryHandler: function(mq) {
+        this.queryMatches = mq.matches;
+        this.asyncFire('core-media-change', mq);
+      }
+    });
+  </script>
+</polymer-element>
+
+<!--
+Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<!--
+
+`core-toolbar` is a horizontal bar containing elements that can be used for
+label, navigation, search and actions.
+
+    <core-toolbar>
+      <paper-icon-button src="menu.png" on-tap="{{menuAction}}"></paper-icon-button>
+      <div core-flex>Title</div>
+      <paper-icon-button src="more.png" on-tap="{{moreAction}}"></paper-icon-button>
+    </core-toolbar>
+
+`core-toolbar` has a standard height, but can be taller by setting `tall`
+class on the `core-toolbar`.
+
+    <core-toolbar class="tall">
+      <paper-icon-button icon="menu"></paper-icon-button>
+    </core-toolbar>
+
+When taller, actions can pin to either the top (default) or the bottom.
+
+    <core-toolbar class="tall">
+      <paper-icon-button class="bottom" icon="menu"></paper-icon-button>
+    </core-toolbar>
+
+Apply `seamed` class to remove the drop shadow.
+
+    <core-toolbar class="seamed">
+      <paper-icon-button icon="menu"></paper-icon-button>
+    </core-toolbar>
+
+`core-toolbar` can adapt to screen size.  If the attribute 
+`responsive` is set and the screen size is less than `responsiveWidth` 
+(default to 800px), the toolbar moves to the bottom of the page.
+
+    <core-toolbar>
+      <paper-icon-button icon="menu"></paper-icon-button>
+      <div core-flex>Title</div>
+      <core-toolbar responsive>
+        <paper-icon-button icon="refresh"></paper-icon-button>
+        <paper-icon-button icon="search"></paper-icon-button>
+      </core-toolbar>
+    </core-toolbar>
+
+@group Polymer Core Elements
+@element core-toolbar
+@homepage github.io
+-->
+
+
+
+
+<polymer-element name="core-toolbar" extends="core-theme-aware" attributes="responsiveWidth" assetpath="../core-toolbar/">
+
+  <template>
+
+    <style>/*
+Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+*/
+
+:host {
+  /* technical */
+  display: block;
+  position: relative;
+  box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  /* size */
+  height: 60px;
+  /* typography */
+  font-size: 21px;
+  color: #333;
+  /* border/shadow */
+  box-shadow: 0px 4px 12px 0px rgba(0, 0, 0, 0.35);
+  /* transition */
+  transition: height ease-in 0.18s;
+}
+
+:host(.core-dark-theme) {
+  color: #eee;
+}
+
+:host(.tall) {
+  height: 188px;
+}
+
+:host(.seamed) {
+  box-shadow: none;
+}
+
+:host(.narrow-layout[responsive]:host) {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  border: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.28);
+}
+
+:host([responsive]:host) {
+  margin: 0 !important;
+  height: 60px;
+  box-shadow: none;
+}
+
+[tools] {
+  height: 60px;
+}
+
+[bottom-tools] {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 60px;
+  pointer-events: none;
+}
+
+/*@polyfill :host > .bottom-tools > * */
+::content[select=".bottom"] > * {
+  pointer-events: visible;
+}
+
+/*@polyfill :host > [tools] > *, :host > .bottom-tools > * */
+::content > * {
+  margin: 0px 8px 0 8px;
+}
+</style>
+    <style>/*
+Copyright 2013 The Polymer Authors. All rights reserved.
+Use of this source code is governed by a BSD-style
+license that can be found in the LICENSE file.
+*/
+
+[core-flow] {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: -moz-flex;
+  display: -webkit-flex;
+  display: flex;
+}
+
+[core-flow=h] {
+  -webkit-box-orient: horizontal;
+  -ms-flex-direction: row;
+  -moz-flex-direction: row;
+  -webkit-flex-direction: row;
+  flex-direction: row;
+}
+
+[core-flow=h][core-reverse] {
+  -webkit-box-direction: reverse;
+  -ms-flex-direction: row-reverse;
+  -moz-flex-direction: row-reverse;
+  -webkit-flex-direction: row-reverse;
+  flex-direction: row-reverse;
+}
+
+[core-flow=v] {
+  -webkit-box-orient: vertical;
+  -ms-flex-direction: column;
+  -moz-flex-direction: column;
+  -webkit-flex-direction: column;
+  flex-direction: column;
+}
+
+[core-flow=v][core-reverse] {
+  -webkit-box-direction: reverse;
+  -ms-flex-direction: column-reverse;
+  -moz-flex-direction: column-reverse;
+  -webkit-flex-direction: column-reverse;
+  flex-direction: column-reverse;
+}
+
+[core-relative] {
+  position: relative;
+}
+
+[core-fit] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+}
+
+body[core-fit] {
+  margin: 0;
+}
+
+[core-flex] {
+  -webkit-box-flex: 1;
+  -ms-flex: 1;
+  -moz-flex: 1;
+  -webkit-flex: 1;
+  flex: 1;
+}
+
+[core-flex=1] {
+  -webkit-box-flex: 1;
+  -ms-flex: 1;
+  -moz-flex: 1;
+  -webkit-flex: 1;
+  flex: 1;
+}
+
+[core-flex=2] {
+  -webkit-box-flex: 2;
+  -ms-flex: 2;
+  -moz-flex: 2;
+  -webkit-flex: 2;
+  flex: 2;
+}
+
+[core-flex=3] {
+  -webkit-box-flex: 3;
+  -ms-flex: 3;
+  -moz-flex: 3;
+  -webkit-flex: 3;
+  flex: 3;
+}
+
+[core-flex=4] {
+  -webkit-box-flex: 4;
+  -ms-flex: 4;
+  -moz-flex: 4;
+  -webkit-flex: 4;
+  flex: 4;
+}
+
+[core-flex=5] {
+  -webkit-box-flex: 5;
+  -ms-flex: 5;
+  -moz-flex: 5;
+  -webkit-flex: 5;
+  flex: 5;
+}
+
+/* distributed elements */
+::content > [core-flex] {
+  -webkit-box-flex: 1;
+  -ms-flex: 1;
+  -moz-flex: 1;
+  -webkit-flex: 1;
+  flex: 1;
+}
+
+::content > [core-flex=1] {
+  -webkit-box-flex: 1;
+  -ms-flex: 1;
+  -moz-flex: 1;
+  -webkit-flex: 1;
+  flex: 1;
+}
+
+::content > [core-flex=2] {
+  -webkit-box-flex: 2;
+  -ms-flex: 2;
+  -moz-flex: 2;
+  -webkit-flex: 2;
+  flex: 2;
+}
+
+::content > [core-flex=3] {
+  -webkit-box-flex: 3;
+  -ms-flex: 3;
+  -moz-flex: 3;
+  -webkit-flex: 3;
+  flex: 3;
+}
+
+::content > [core-flex=4] {
+  -webkit-box-flex: 4;
+  -ms-flex: 4;
+  -moz-flex: 4;
+  -webkit-flex: 4;
+  flex: 4;
+}
+
+::content > [core-flex=5] {
+  -webkit-box-flex: 5;
+  -ms-flex: 5;
+  -moz-flex: 5;
+  -webkit-flex: 5;
+  flex: 5;
+}
+
+/* alignment in main axis */
+[justify=start] {
+  -webkit-box-pack: start;
+  -ms-flex-pack: start;
+  -moz-justify-content: flex-start;
+  -webkit-justify-content: flex-start;
+  justify-content: flex-start;
+}
+
+[core-justify=center] {
+  -webkit-box-pack: center;
+  -ms-flex-pack: center;
+  -moz-justify-content: center;
+  -webkit-justify-content: center;
+  justify-content: center;
+}
+
+[core-justify=end] {
+  -webkit-box-pack: end;
+  -ms-flex-pack: end;
+  -moz-justify-content: flex-end;
+  -webkit-justify-content: flex-end;
+  justify-content: flex-end;
+}
+
+[core-justify=between] {
+  -webkit-box-pack: justify;
+  -ms-flex-pack: justify;
+  -moz-justify-content: space-between;
+  -webkit-justify-content: space-between;
+  justify-content: space-between;
+}
+
+/* alignment in cross axis */
+[core-align=start] {
+  -webkit-box-align: start;
+  -ms-flex-align: start;
+  -moz-align-items: flex-start;
+  -webkit-align-items: flex-start;
+  align-items: flex-start;
+}
+
+[core-align=center] {
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  -moz-align-items: center;
+  -webkit-align-items: center;
+  align-items: center;
+}
+
+[core-align=end] {
+  -webkit-box-align: end;
+  -ms-flex-align: end;
+  -moz-align-items: flex-end;
+  -webkit-align-items: flex-end;
+  align-items: flex-end;
+}
+</style>
+
+    <core-media-query query="max-width: {{responsiveWidth}}" querymatches="{{queryMatches}}"></core-media-query>
+
+    <div bottom-tools="" core-flow="" core-align="center">
+      <content select=".bottom"></content>
+    </div>
+
+    <div tools="" core-flow="" core-align="center">
+      <content></content>
+    </div>
+
+  </template>
+
+  <script>
+
+    Polymer('core-toolbar', {
+
+      /**
+       * Minimum width until element becomes responsive.
+       *
+       * @attribute responsiveWidth
+       * @type string
+       * @default '800px'
+       */
+      responsiveWidth: '800px',
+      
+      queryMatches: false,
+      defaultTheme: 'core-light-theme',
+
+      queryMatchesChanged: function() {
+        this.classList.toggle('narrow-layout', this.queryMatches);
+      }
+
+    });
+
+  </script>
+
+</polymer-element>
+
+<!--
+Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE
+The complete set of authors may be found at http://polymer.github.io/AUTHORS
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS
+-->
+
+<!--
+/**
+ * @group Polymer Core Elements
+ *
+ * `core-header-panel` contains a header section and a content section. Special
+ * support is provided for scrolling modes when one uses a core-toolbar or equivalent
+ * for the header section.
+ *
+ * Example:
+ *
+ *     <core-header-panel>
+ *       <core-toolbar>Header</core-toolbar>
+ *       <div>Content goes here...</div>
+ *     </core-header-panel>
+ *
+ * If you want to use other than `core-toolbar` for the header, add 
+ * `core-header` class to that element.
+ *
+ * Example:
+ *
+ *     <core-header-panel>
+ *       <div class="core-header">Header</div>
+ *       <div>Content goes here...</div>
+ *     </core-header-panel>
+ *
+ * There are four different modes of header and scrolling behaviors.
+ *
+ * `standard`: The header is a step above the panel. The header will consume the 
+ * panel at the point of entry, preventing it from passing through to the 
+ * opposite side.
+ *
+ * `waterfall`: Similar to standard mode, but header is initially presented as 
+ * seamed with panel, but then separates to form the step.
+ *
+ * `waterfall-tall`: The header is initially taller (`tall` class is added to 
+ * the header).  As the user scrolls, the header separates (forming an edge)
+ * while condensing (`tall` class is removed from the header).
+ *
+ * `scroll`: The header keeps its seam with the panel, and is pushed off screen.
+ *
+ * @element core-header-panel
+ * @homepage github.io
+ */
+-->
+
+
+
+<polymer-element name="core-header-panel" attributes="mode" assetpath="../core-header-panel/">
+
+  <template>
+
+    <style>/*
+Copyright 2013 The Polymer Authors. All rights reserved.
+Use of this source code is governed by a BSD-style
+license that can be found in the LICENSE file.
+*/
+
+:host {
+  display: block;
+}
+
+.header-panel-container {
+  position: relative;
+  height: 100%;
+  overflow: auto;
+}
+
+#mainContainer {
+  position: relative;
+  overflow: auto;
+}
+
+:host([mode=scroll]) #mainContainer {
+  overflow: visible;
+}
+
+:host([mode=scroll]) ::content#mainContent > * {
+  overflow: hidden;
+}</style>
+    <style>/*
+Copyright 2013 The Polymer Authors. All rights reserved.
+Use of this source code is governed by a BSD-style
+license that can be found in the LICENSE file.
+*/
+
+[core-flow] {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: -moz-flex;
+  display: -webkit-flex;
+  display: flex;
+}
+
+[core-flow=h] {
+  -webkit-box-orient: horizontal;
+  -ms-flex-direction: row;
+  -moz-flex-direction: row;
+  -webkit-flex-direction: row;
+  flex-direction: row;
+}
+
+[core-flow=h][core-reverse] {
+  -webkit-box-direction: reverse;
+  -ms-flex-direction: row-reverse;
+  -moz-flex-direction: row-reverse;
+  -webkit-flex-direction: row-reverse;
+  flex-direction: row-reverse;
+}
+
+[core-flow=v] {
+  -webkit-box-orient: vertical;
+  -ms-flex-direction: column;
+  -moz-flex-direction: column;
+  -webkit-flex-direction: column;
+  flex-direction: column;
+}
+
+[core-flow=v][core-reverse] {
+  -webkit-box-direction: reverse;
+  -ms-flex-direction: column-reverse;
+  -moz-flex-direction: column-reverse;
+  -webkit-flex-direction: column-reverse;
+  flex-direction: column-reverse;
+}
+
+[core-relative] {
+  position: relative;
+}
+
+[core-fit] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+}
+
+body[core-fit] {
+  margin: 0;
+}
+
+[core-flex] {
+  -webkit-box-flex: 1;
+  -ms-flex: 1;
+  -moz-flex: 1;
+  -webkit-flex: 1;
+  flex: 1;
+}
+
+[core-flex=1] {
+  -webkit-box-flex: 1;
+  -ms-flex: 1;
+  -moz-flex: 1;
+  -webkit-flex: 1;
+  flex: 1;
+}
+
+[core-flex=2] {
+  -webkit-box-flex: 2;
+  -ms-flex: 2;
+  -moz-flex: 2;
+  -webkit-flex: 2;
+  flex: 2;
+}
+
+[core-flex=3] {
+  -webkit-box-flex: 3;
+  -ms-flex: 3;
+  -moz-flex: 3;
+  -webkit-flex: 3;
+  flex: 3;
+}
+
+[core-flex=4] {
+  -webkit-box-flex: 4;
+  -ms-flex: 4;
+  -moz-flex: 4;
+  -webkit-flex: 4;
+  flex: 4;
+}
+
+[core-flex=5] {
+  -webkit-box-flex: 5;
+  -ms-flex: 5;
+  -moz-flex: 5;
+  -webkit-flex: 5;
+  flex: 5;
+}
+
+/* distributed elements */
+::content > [core-flex] {
+  -webkit-box-flex: 1;
+  -ms-flex: 1;
+  -moz-flex: 1;
+  -webkit-flex: 1;
+  flex: 1;
+}
+
+::content > [core-flex=1] {
+  -webkit-box-flex: 1;
+  -ms-flex: 1;
+  -moz-flex: 1;
+  -webkit-flex: 1;
+  flex: 1;
+}
+
+::content > [core-flex=2] {
+  -webkit-box-flex: 2;
+  -ms-flex: 2;
+  -moz-flex: 2;
+  -webkit-flex: 2;
+  flex: 2;
+}
+
+::content > [core-flex=3] {
+  -webkit-box-flex: 3;
+  -ms-flex: 3;
+  -moz-flex: 3;
+  -webkit-flex: 3;
+  flex: 3;
+}
+
+::content > [core-flex=4] {
+  -webkit-box-flex: 4;
+  -ms-flex: 4;
+  -moz-flex: 4;
+  -webkit-flex: 4;
+  flex: 4;
+}
+
+::content > [core-flex=5] {
+  -webkit-box-flex: 5;
+  -ms-flex: 5;
+  -moz-flex: 5;
+  -webkit-flex: 5;
+  flex: 5;
+}
+
+/* alignment in main axis */
+[justify=start] {
+  -webkit-box-pack: start;
+  -ms-flex-pack: start;
+  -moz-justify-content: flex-start;
+  -webkit-justify-content: flex-start;
+  justify-content: flex-start;
+}
+
+[core-justify=center] {
+  -webkit-box-pack: center;
+  -ms-flex-pack: center;
+  -moz-justify-content: center;
+  -webkit-justify-content: center;
+  justify-content: center;
+}
+
+[core-justify=end] {
+  -webkit-box-pack: end;
+  -ms-flex-pack: end;
+  -moz-justify-content: flex-end;
+  -webkit-justify-content: flex-end;
+  justify-content: flex-end;
+}
+
+[core-justify=between] {
+  -webkit-box-pack: justify;
+  -ms-flex-pack: justify;
+  -moz-justify-content: space-between;
+  -webkit-justify-content: space-between;
+  justify-content: space-between;
+}
+
+/* alignment in cross axis */
+[core-align=start] {
+  -webkit-box-align: start;
+  -ms-flex-align: start;
+  -moz-align-items: flex-start;
+  -webkit-align-items: flex-start;
+  align-items: flex-start;
+}
+
+[core-align=center] {
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  -moz-align-items: center;
+  -webkit-align-items: center;
+  align-items: center;
+}
+
+[core-align=end] {
+  -webkit-box-align: end;
+  -ms-flex-align: end;
+  -moz-align-items: flex-end;
+  -webkit-align-items: flex-end;
+  align-items: flex-end;
+}
+</style>
+    
+    <div class="header-panel-container" core-flow="v" on-scroll="{{scroll}}">
+
+      <content id="headerContent" select="core-toolbar, paper-appbar, .core-header"></content>
+
+      <div id="mainContainer" core-flex="" on-scroll="{{scroll}}">
+        <content id="mainContent" select="*"></content>
+      </div>
+
+    </div>
+
+  </template>
+
+  <script>
+
+    Polymer('core-header-panel', {
+
+      /**
+       * Controls header and scrolling behavior. Options are
+       * `standard`, `waterfall`, `waterfall-tall` and `scroll`.
+       * Default is `standard`.
+       *
+       * `standard`: The header is a step above the panel. The header will consume the 
+       * panel at the point of entry, preventing it from passing through to the 
+       * opposite side.
+       *
+       * `waterfall`: Similar to standard mode, but header is initially presented as 
+       * seamed with panel, but then separates to form the step.
+       *
+       * `waterfall-tall`: The header is initially taller (`tall` class is added to 
+       * the header).  As the user scrolls, the header separates (forming an edge)
+       * while condensing (`tall` class is removed from the header).
+       *
+       * `scroll`: The header keeps its seam with the panel, and is pushed off screen.
+       *
+       * @attribute mode
+       * @type string
+       * @default ''
+       */
+      mode: '',
+
+      ready: function() {
+        this.scroll();
+      },
+
+      modeChanged: function() {
+        this.scroll();
+      },
+
+      get header() {
+        return this.$.headerContent.getDistributedNodes()[0];
+      },
+
+      scroll: function() {
+        var seamedMode = {'waterfall': 1, 'waterfall-tall': 1, 'scroll': 1}; 
+        var tallMode = {'waterfall-tall': 1};
+        var atTop = (this.$.mainContainer.scrollTop === 0);
+        var header = this.header;
+        if (header) {
+          header.classList.toggle('seamed', atTop && seamedMode[this.mode]);
+          if (tallMode[this.mode]) {
+            header.classList.toggle('tall', atTop);
+          }
+        }
       }
 
     });
@@ -4888,7 +4539,7 @@ element.
 
 
 
-<polymer-element name="context-free-parser" attributes="url text data" assetpath="../core-doc-viewer/">
+<polymer-element name="context-free-parser" attributes="url text data" assetpath="../core-doc-viewer/elements/">
 
   <template>
 
@@ -5014,27 +4665,26 @@ element.
 
 
 
-
-
 <!--
 
 Displays formatted source documentation scraped from input urls.
 
-@group Polymer Core Elements
-@element core-doc-viewer
-
+@class core-doc-page
 -->
 
-<polymer-element name="core-doc-viewer" attributes="url href sources" assetpath="../core-doc-viewer/">
-<template>
+<polymer-element name="core-doc-page" attributes="data" assetpath="../core-doc-viewer/elements/">
 
-  <context-free-parser url="{{url}}" on-data-ready="{{parserDataReady}}"></context-free-parser>
+<!--
 
-  <template repeat="{{sources}}">
-    <context-free-parser url="{{}}" on-data-ready="{{parserDataReady}}"></context-free-parser>
-  </template>
+Set url to add documentation from that location to the view.
 
-  <style>/*
+@attribute url
+@type String
+-->
+
+  <template>
+
+    <style>/*
 
 Original style from softwaremaniacs.org (c) Ivan Sagalaev <Maniac@SoftwareManiacs.Org>
 
@@ -5188,13 +4838,17 @@ Original style from softwaremaniacs.org (c) Ivan Sagalaev <Maniac@SoftwareManiac
   opacity: 0.5;
 }
 </style>
-  <style>:host {
+    <style>:host {
   display: block;
-  /*height: 100%;*/
 }
 
-div {
+markedjs-element {
   display: block;
+}
+
+h1 {
+  font-size: 52px;
+  color: #E91E63
 }
 
 .element {
@@ -5218,336 +4872,1091 @@ div {
   display: inline-block;
   padding: 4px 12px 5px 12px;
   margin: 4px 0;
-  /*padding: 0.35em 1em;
-  margin: 0.3em 0;*/
-}
-
-.method {
-  background-color: #0F9D58;
-}
-
-.event {
-  background-color: #F4B400;
-}
-
-.nattribute {
-  background-color: #4285F4;
-  border-radius: 2px 0 0 2px;
-}
-
-.type {
-  background-color: white;
-  border: 1px solid #4285F4;
-  color: #4285F4;
-  font-weight: bold;
-  border-radius: 0 2px 2px 0;
-  padding-top: 3px;
-  padding-bottom: 4px;
-}
-
-.header {
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-left: none;
-  border-right: none;
-  padding: 0 16px;
-  line-height: 75px;
 }
 
 .ntitle {
-  font-size: 13px;
-  font-weight: bold;
-  margin: 8px 0;
+  font-size: 26px;
 }
 
 .box {
   margin-bottom: 40px;
 }
 
-pre code {
-  font-size: 14px;
+.top pre {
   padding: 12px 13px;
-  max-width: 800px;
+  background-color: #f8f8f8;
+}
+
+code {
+  font-family: Consolas, monospace;
+  border: 1px solid #ddd;
+  background-color: #f8f8f8;
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
+pre code {
+  max-width: 832px;
   white-space: pre-wrap;
   overflow: hidden;
+  border: none;
 }
 
-a {
-  color: #666;
-  text-decoration: none;
+.main {
+  padding: 0 72px;
+  max-width: 832px;
 }
 
-.summary {
-  width: 240px; 
-  padding: 16px;
+/**/
+
+core-toolbar {
+  background-color: #E91E63;
+  color: white;
 }
 
-@media (max-width: 900px) {
-  .summary {
-    display: none;
-  }
+.details-name {
+  display: inline-block; 
+  vertical-align: top;
+  width: 220px;
 }
 
-#menu {
-  width: 280px;
+.details-info {
+  display: inline-block;
+  max-width: 540px;
 }
 
-#docs {
-  overflow-x: auto;
-  background-color: white;
+.attribute-box {
 }
 
-#docsInner {
-  min-width: 500px;
+.attribute-box .details {
+  background-color: #FFF9C4;
+  padding: 8px 16px;
+  border-bottom: 1px solid #D1CCA1;
 }
 
-#fixed {
-  position: fixed;
-  opacity: 0.95;
-  right: 24px;
-  left: 296px;
-  background-color: white;
-  z-index: 1000;
-  display: none;
+.attribute-box .ntitle {
+  padding: 24px 16px;
 }
 
-.animate {
-  -webkit-transition-property: left, top, width, height;
-  -webkit-transition-duration: 0.3s;
-  -webkit-transition-timing-function: ease-out;
+.attribute-box code {
+  color: #FFAB40;
+  border: none;
+  background-color: transparent;
+  border-radius: none;
+  padding: 0;
+  font-size: 1.2em;
 }
+
+.method-box {
+}
+
+.method-box .details {
+  background-color: #F0F4C3;
+  padding: 8px 16px;
+  border-bottom: 1px solid #D1CCA1;
+}
+
+.method-box .ntitle {
+  background-color: #9E9D24;
+  padding: 24px 16px;
+}
+
+.method-box code {
+  color: #9E9D24;
+  border: none;
+  background-color: transparent;
+  border-radius: none;
+  padding: 0;
+  font-size: 1.2em;
+}
+
+.event-box {
+}
+
+.event-box .details {
+  background-color: #B2DFDB;
+  padding: 8px 16px;
+  border-bottom: 1px solid #92B7B3;
+}
+
+.event-box .ntitle {
+  background-color: #009688;
+  padding: 24px 16px;
+}
+
+.event-box code {
+  color: #009688;
+  border: none;
+  background-color: transparent;
+  border-radius: none;
+  padding: 0;
+  font-size: 1.2em;
+}
+
+
 </style>
 
-  <core-layout-grid id="grid" on-core-layout="{{gridLayout}}"></core-layout-grid>
+    <core-header-panel style="height: 100%;" mode="waterfall">
 
-  <div id="navigation" offscreen="basement" style="overflow-y: scroll;">
+      <core-toolbar>
+        <span style="margin: 0 72px;">{{data.name}}</span>
+      </core-toolbar>
 
-    <core-menu selected="0" id="menu">
+      <div class="main" on-marked-js-highlight="{{hilight}}">
 
-      <template repeat="{{classes}}">
-        <core-item><a href="#{{name}}">{{name}}</a></core-item>
-      </template>
+        <h1 style="font-size: 52px; color: #E91E63;">
+          {{data.name}}
+        </h1>
 
-    </core-menu>
+        <template if="{{data.description}}">
+          <section class="box top">
+            <div class="ntitle">Summary</div>
+            <marked-element text="{{data.description}}"></marked-element>
+          </section>
+        </template>
 
-  </div>
+        <template if="{{data.attributes.length}}">
+          <section class="box attribute-box">
+            <div class="ntitle" style="background-color: #FFAB40; color: white;">Attributes</div>
+            <template repeat="{{data.attributes}}">
+              <div class="details">
+                <div class="details-name">
+                  <p><code>{{name}}</code></p>
+                </div>
+                <div class="details-info">
+                  <p><code>{{type}}</code></p>
+                  <marked-element text="{{description}}"></marked-element>
+                </div>
+              </div>
+            </template>
+          </section>
+        </template>
 
-  <div id="docs" flex="" on-marked-js-highlight="{{hilight}}" on-scroll="{{docsScroll}}">
-    <div id="docsInner" flex="">
+        <template if="{{data.events.length}}">
+          <section class="box event-box">
+            <div class="ntitle" style="color: white;">Events</div>
+            <template repeat="{{data.events}}">
+              <div class="details">
+                <div class="details-name">
+                  <p><code>{{name}}</code></p>
+                </div>
+                <div class="details-info">
+                  <marked-element text="{{description}}"></marked-element>
+                </div>
+              </div>
+            </template>
+          </section>
+        </template>
 
-      <div id="fixed">
-        <div class="header">
+        <template if="{{data.methods.length}}">
+          <section class="box method-box">
+            <div class="ntitle" style="color: white;">Methods</div>
+            <template repeat="{{data.methods}}">
+              <div class="details">
+                <div class="details-name">
+                  <p><code>{{name}}</code></p>
+                </div>
+                <div class="details-info">
+                  <marked-element text="{{description}}"></marked-element>
+                </div>
+              </div>
+            </template>
+          </section>
+        </template>
 
-          <core-icon-button icon="menu" on-tap="{{toggleNav}}" active="{{navOpen}}"></core-icon-button>
-          &nbsp;<span id="fixedTopic" class="element"></span>
-
-        </div>
       </div>
 
-      <template repeat="{{class in classes}}">
+    </core-header-panel>
 
-        <a id="{{class.name}}" class="element"></a>
+  </template>
 
-        <div class="header topic">
-          <core-icon-button on-tap="{{toggleLayout}}" icon="menu" style="visibility: hidden;"></core-icon-button>
-          &nbsp;<span class="element">{{class.name}}</span>
-        </div>
-  
-        <div>
-          <core-layout></core-layout>
+  <script>
 
-          <div class="summary">
+    Polymer('core-doc-page', {
 
-            <template if="{{class.methods.length}}">
-              <section class="box">
-                <div class="ntitle">Methods</div>
-                <template repeat="{{class.methods}}">
-                  <span class="name method">{{name}}</span><br>
-                </template>
-              </section>
-            </template>
+      hilight: function(event, detail, sender) {
+        detail.code = hljs.highlightAuto(detail.code).value;
+      }
 
-            <template if="{{class.attributes.length}}">
-              <section class="box">
-                <div class="ntitle">Attributes</div>
-                <template repeat="{{class.attributes}}">
-                  <span class="name nattribute">{{name}}</span><br>
-                </template>
-              </section>
-            </template>
+    });
 
-            <template if="{{class.events.length}}">
-              <section class="box">
-                <div class="ntitle">Events</div>
-                <template repeat="{{class.events}}">
-                  <span class="name event">{{name}}</span><br>
-                </template>
-              </section>
-            </template>
+  </script>
 
-          </div>
+</polymer-element>
 
-          <div flex="">
-            <div style="padding: 16px;">
+<!--
+Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+<!--
+/**
+ * @group Polymer Core Elements
+ *
+ * The core-selection element is used to manage selection state. It has no
+ * visual appearance and is typically used in conjuneciton with another element.
+ * For example, <a href="core-selector.html">core-selector</a>
+ * use a core-selection to manage selection.
+ *
+ * To mark an item as selected, call the select(item) method on 
+ * core-selection. Notice that the item itself is an argument to this method.
+ * The core-selection element manages selection state for any given set of
+ * items. When an item is selected, the `core-select` event is fired.
+ * The attribute "multi" indicates if multiple items can be selected at once.
+ * 
+ * Example:
+ *
+ *     <core-element name="selection-example">
+ *        <template>
+ *          <style>
+ *            ::-webkit-distributed(> .selected) {
+ *              font-weight: bold;
+ *              font-style: italic;
+ *            }
+ *          </style>
+ *          <ul on-tap="{{itemTapAction}}">
+ *            <content></content>
+ *          </ul>
+ *          <core-selection id="selection" multi on-core-select="{{selectAction}}"></core-selection>
+ *        </template>
+ *        <script>
+ *          Polymer('selection-example', {
+ *            itemTapAction: function(e) {
+ *              this.$.selection.select(e.target);
+ *            },
+ *            selectAction: function(e, detail) {
+ *              detail.item.classList.toggle('selected', detail.isSelected);
+ *            }
+ *          });
+ *        </script>
+ *     </core-element>
+ *
+ *     <selection-example>
+ *       <li>Red</li>
+ *       <li>Green</li>
+ *       <li>Blue</li>
+ *     </selection-example>
+ *
+ * @element core-selection
+ */
+ /**
+ * Fired when an item's selection state is changed. This event is fired both
+ * when an item is selected or deselected. The `isSelected` detail property
+ * contains the selection state.
+ * 
+ * @event core-select
+ * @param {Object} detail
+ *   @param {boolean} detail.isSelected true for selection and false for deselection
+ *   @param {Object} detail.item the item element
+ */
+-->
 
-              <template if="{{class.description}}">
-                <section class="box">
-                  <div class="ntitle">Description</div>
-                  <marked-element text="{{class.description}}"></marked-element>
-                </section>
-              </template>
 
-              <template if="{{class.methods.length}}">
-                <section class="box">
-                  <div class="ntitle">Methods</div>
-                  <template repeat="{{class.methods}}">
-                    <span class="name method">{{name}}</span>
-                    <marked-element text="{{description}}"></marked-element>
-                  </template>
-                </section>
-              </template>
+<polymer-element name="core-selection" attributes="multi" assetpath="../core-selection/">
+  <template>
+    <style>
+      :host {
+        display: none !important;
+      }
+    </style>
+  </template>
+  <script>
+    Polymer('core-selection', {
+      /**
+       * If true, multiple selections are allowed.
+       *
+       * @attribute multi
+       * @type boolean
+       * @default false
+       */
+      multi: false,
+      ready: function() {
+        this.clear();
+      },
+      clear: function() {
+        this.selection = [];
+      },
+      /**
+       * Retrieves the selected item(s).
+       * @method getSelection
+       * @returns Returns the selected item(s). If the multi property is true,
+       * getSelection will return an array, otherwise it will return 
+       * the selected item or undefined if there is no selection.
+      */
+      getSelection: function() {
+        return this.multi ? this.selection : this.selection[0];
+      },
+      /**
+       * Indicates if a given item is selected.
+       * @method isSelected
+       * @param {any} item The item whose selection state should be checked.
+       * @returns Returns true if `item` is selected.
+      */
+      isSelected: function(item) {
+        return this.selection.indexOf(item) >= 0;
+      },
+      setItemSelected: function(item, isSelected) {
+        if (item !== undefined && item !== null) {
+          if (isSelected) {
+            this.selection.push(item);
+          } else {
+            var i = this.selection.indexOf(item);
+            if (i >= 0) {
+              this.selection.splice(i, 1);
+            }
+          }
+          this.fire("core-select", {isSelected: isSelected, item: item});
+        }
+      },
+      /**
+       * Set the selection state for a given `item`. If the multi property
+       * is true, then the selected state of `item` will be toggled; otherwise
+       * the `item` will be selected.
+       * @method select
+       * @param {any} item: The item to select.
+      */
+      select: function(item) {
+        if (this.multi) {
+          this.toggle(item);
+        } else if (this.getSelection() !== item) {
+          this.setItemSelected(this.getSelection(), false);
+          this.setItemSelected(item, true);
+        }
+      },
+      /**
+       * Toggles the selection state for `item`.
+       * @method toggle
+       * @param {any} item: The item to toggle.
+      */
+      toggle: function(item) {
+        this.setItemSelected(item, !this.isSelected(item));
+      }
+    });
+  </script>
+</polymer-element>
 
-              <template if="{{class.attributes.length}}">
-                <section class="box">
-                  <div class="ntitle">Attributes</div>
-                  <template repeat="{{class.attributes}}">
-                    <span class="name nattribute">{{name}}</span><span class="name type">{{type}}</span>
-                    <marked-element text="{{description}}"></marked-element>
-                  </template>
-                </section>
-              </template>
+<!--
+Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
 
-              <template if="{{class.events.length}}">
-                <section class="box">
-                  <div class="ntitle">Events</div>
-                  <template repeat="{{class.events}}">
-                    <span class="name event">{{name}}</span>
-                    <marked-element text="{{description}}"></marked-element>
-                  </template>
-                </section>
-              </template>
+<!--
+/**
+ * @group Polymer Core Elements
+ */
 
-            </div>
-          </div>
-        </div>
-      </template>
+/**
+ * core-selector is used to manage a list of elements that can be selected.
+ * The attribute "selected" indicates which item element is being selected.
+ * The attribute "multi" indicates if multiple items can be selected at once.
+ * Tapping on the item element would fire "core-activate" event. Use
+ * "core-select" event to listen for selection changes.
+ *
+ * Example:
+ *
+ *     <core-selector selected="0">
+ *       <div>Item 1</div>
+ *       <div>Item 2</div>
+ *       <div>Item 3</div>
+ *     </core-selector>
+ *
+ * core-selector is not styled.  So one needs to use "core-selected" CSS
+ * class to style the selected element.
+ * 
+ *     <style>
+ *       .item.core-selected {
+ *         background: #eee;
+ *       }
+ *     </style>
+ *     ...
+ *     <core-selector>
+ *       <div class="item">Item 1</div>
+ *       <div class="item">Item 2</div>
+ *       <div class="item">Item 3</div>
+ *     </core-selector>
+ *
+ * @element core-selector
+ * @status stable
+ * @homepage github.io
+ */
 
-      <hr>
-      <div style="height: 1024px"></div>
+/**
+ * Fired when an item's selection state is changed. This event is fired both
+ * when an item is selected or deselected. The `isSelected` detail property
+ * contains the selection state.
+ * 
+ * @event core-select
+ * @param {Object} detail
+ *   @param {boolean} detail.isSelected true for selection and false for deselection
+ *   @param {Object} detail.item the item element
+ */
 
-    </div>
-  </div>
+/**
+ * Fired when an item element is tapped.
+ * 
+ * @event core-activate
+ * @param {Object} detail
+ *   @param {Object} detail.item the item element
+ */
+-->
+
+
+
+
+<polymer-element name="core-selector" assetpath="../core-selector/">
+
+  <template>
+
+    <core-selection id="selection" multi="{{multi}}" on-core-select="{{selectionSelect}}"></core-selection>
+    <content id="items" select="*"></content>
+
+  </template>
+
+  <script>
+
+    Polymer('core-selector', {
+      publish: {
+        /**
+         * Gets or sets the selected element.  Default to use the index
+         * of the item element.
+         *
+         * If you want a specific attribute value of the element to be
+         * used instead of index, set "valueattr" to that attribute name.
+         *
+         * Example:
+         *
+         *     <core-selector valueattr="label" selected="foo">
+         *       <div label="foo"></div>
+         *       <div label="bar"></div>
+         *       <div label="zot"></div>
+         *     </core-selector>
+         *
+         * In multi-selection this should be an array of values.
+         *
+         * Example:
+         *
+         *     <core-selector id="selector" valueattr="label" multi>
+         *       <div label="foo"></div>
+         *       <div label="bar"></div>
+         *       <div label="zot"></div>
+         *     </core-selector>
+         *
+         *     this.$.selector.selected = ['foo', 'zot'];
+         *
+         * @attribute selected
+         * @type Object
+         * @default null
+         */
+        selected: -1,
+
+        /**
+         * If true, multiple selections are allowed.
+         *
+         * @attribute multi
+         * @type boolean
+         * @default false
+         */
+        multi: false,
+
+        /**
+         * Specifies the attribute to be used for "selected" attribute.
+         *
+         * @attribute valueattr
+         * @type string
+         * @default 'name'
+         */
+        valueattr: 'name',
+
+        /**
+         * Specifies the CSS class to be used to add to the selected element.
+         * 
+         * @attribute selectedClass
+         * @type string
+         * @default 'core-selected'
+         */
+        selectedClass: 'core-selected',
+
+        /**
+         * Specifies the property to be used to set on the selected element
+         * to indicate its active state.
+         *
+         * @attribute selectedProperty
+         * @type string
+         * @default ''
+         */
+        selectedProperty: '',
+
+        /**
+         * Specifies the property to be used to set on the selected element
+         * to indicate its active state.
+         *
+         * @attribute selectedProperty
+         * @type string
+         * @default 'active'
+         */
+        selectedAttribute: 'active',
+
+        /**
+         * Returns the currently selected element. In multi-selection this returns
+         * an array of selected elements.
+         * 
+         * @attribute selectedItem
+         * @type Object
+         * @default null
+         */
+        selectedItem: null,
+
+        /**
+         * In single selection, this returns the model associated with the
+         * selected element.
+         * 
+         * @attribute selectedModel
+         * @type Object
+         * @default null
+         */
+        selectedModel: null,
+
+        /**
+         * In single selection, this returns the selected index.
+         *
+         * @attribute selectedIndex
+         * @type number
+         * @default -1
+         */
+        selectedIndex: -1,
+
+        /**
+         * The target element that contains items.  If this is not set 
+         * core-selector is the container.
+         * 
+         * @attribute target
+         * @type Object
+         * @default null
+         */
+        target: null,
+
+        /**
+         * This can be used to query nodes from the target node to be used for 
+         * selection items.  Note this only works if the 'target' property is set.
+         *
+         * Example:
+         *
+         *     <core-selector target="{{$.myForm}}" itemsSelector="input[type=radio]"></core-selector>
+         *     <form id="myForm">
+         *       <label><input type="radio" name="color" value="red"> Red</label> <br>
+         *       <label><input type="radio" name="color" value="green"> Green</label> <br>
+         *       <label><input type="radio" name="color" value="blue"> Blue</label> <br>
+         *       <p>color = {{color}}</p>
+         *     </form>
+         * 
+         * @attribute itemSelector
+         * @type string
+         * @default ''
+         */
+        itemsSelector: '',
+
+        /**
+         * The event that would be fired from the item element to indicate
+         * it is being selected.
+         *
+         * @attribute activateEvent
+         * @type string
+         * @default 'tap'
+         */
+        activateEvent: 'tap',
+
+        /**
+         * Set this to true to disallow changing the selection via the
+         * `activateEvent`.
+         *
+         * @attribute notap
+         * @type boolean
+         * @default false
+         */
+        notap: false,
+      },
+
+      ready: function() {
+        this.activateListener = this.activateHandler.bind(this);
+        this.observer = new MutationObserver(this.updateSelected.bind(this));
+        if (!this.target) {
+          this.target = this;
+        }
+      },
+
+      get items() {
+        var nodes = this.target !== this ? (this.itemsSelector ? 
+            this.target.querySelectorAll(this.itemsSelector) : 
+                this.target.children) : this.$.items.getDistributedNodes();
+        return Array.prototype.filter.call(nodes || [], function(n) {
+          return n && n.localName !== 'template';
+        });
+      },
+
+      targetChanged: function(old) {
+        if (old) {
+          this.removeListener(old);
+          this.observer.disconnect();
+        }
+        if (this.target) {
+          this.addListener(this.target);
+          this.observer.observe(this.target, {childList: true});
+        }
+      },
+
+      addListener: function(node) {
+        node.addEventListener(this.activateEvent, this.activateListener);
+      },
+
+      removeListener: function(node) {
+        node.removeEventListener(this.activateEvent, this.activateListener);
+      },
+
+      get selection() {
+        return this.$.selection.getSelection();
+      },
+
+      selectedChanged: function() {
+        this.updateSelected();
+      },
+
+      updateSelected: function() {
+        this.validateSelected();
+        if (this.multi) {
+          this.clearSelection();
+          this.selected && this.selected.forEach(function(s) {
+            this.valueToSelection(s);
+          }, this);
+        } else {
+          this.valueToSelection(this.selected);
+        }
+      },
+
+      validateSelected: function() {
+        // convert to an array for multi-selection
+        if (this.multi && !Array.isArray(this.selected) && 
+            this.selected !== null && this.selected !== undefined) {
+          this.selected = [this.selected];
+        }
+      },
+
+      clearSelection: function() {
+        if (this.multi) {
+          this.selection.slice().forEach(function(s) {
+            this.$.selection.setItemSelected(s, false);
+          }, this);
+        } else {
+          this.$.selection.setItemSelected(this.selection, false);
+        }
+        this.selectedItem = null;
+        this.$.selection.clear();
+      },
+
+      valueToSelection: function(value) {
+        var item = (value === null || value === undefined) ? 
+            null : this.items[this.valueToIndex(value)];
+        this.$.selection.select(item);
+      },
+
+      updateSelectedItem: function() {
+        this.selectedItem = this.selection;
+      },
+
+      selectedItemChanged: function() {
+        if (this.selectedItem) {
+          var t = this.selectedItem.templateInstance;
+          this.selectedModel = t ? t.model : undefined;
+        } else {
+          this.selectedModel = null;
+        }
+        this.selectedIndex = this.selectedItem ? 
+            parseInt(this.valueToIndex(this.selected)) : -1;
+      },
+
+      valueToIndex: function(value) {
+        // find an item with value == value and return it's index
+        for (var i=0, items=this.items, c; (c=items[i]); i++) {
+          if (this.valueForNode(c) == value) {
+            return i;
+          }
+        }
+        // if no item found, the value itself is probably the index
+        return value;
+      },
+
+      valueForNode: function(node) {
+        return node[this.valueattr] || node.getAttribute(this.valueattr);
+      },
+
+      // events fired from <core-selection> object
+      selectionSelect: function(e, detail) {
+        this.updateSelectedItem();
+        if (detail.item) {
+          this.applySelection(detail.item, detail.isSelected);
+        }
+      },
+
+      applySelection: function(item, isSelected) {
+        if (this.selectedClass) {
+          item.classList.toggle(this.selectedClass, isSelected);
+        }
+        if (this.selectedProperty) {
+          item[this.selectedProperty] = isSelected;
+        }
+        if (this.selectedAttribute && item.setAttribute) {
+          if (isSelected) {
+            item.setAttribute(this.selectedAttribute, '');
+          } else {
+            item.removeAttribute(this.selectedAttribute);
+          }
+        }
+      },
+
+      // event fired from host
+      activateHandler: function(e) {
+        if (!this.notap) {
+          var i = this.findDistributedTarget(e.target, this.items);
+          if (i >= 0) {
+            var item = this.items[i];
+            var s = this.valueForNode(item) || i;
+            if (this.multi) {
+              if (this.selected) {
+                this.addRemoveSelected(s);
+              } else {
+                this.selected = [s];
+              }
+            } else {
+              this.selected = s;
+            }
+            this.asyncFire('core-activate', {item: item});
+          }
+        }
+      },
+
+      addRemoveSelected: function(value) {
+        var i = this.selected.indexOf(value);
+        if (i >= 0) {
+          this.selected.splice(i, 1);
+        } else {
+          this.selected.push(value);
+        }
+        this.valueToSelection(value);
+      },
+
+      findDistributedTarget: function(target, nodes) {
+        // find first ancestor of target (including itself) that
+        // is in nodes, if any
+        while (target && target != this) {
+          var i = Array.prototype.indexOf.call(nodes, target);
+          if (i >= 0) {
+            return i;
+          }
+          target = target.parentNode;
+        }
+      }
+    });
+  </script>
+</polymer-element>
+
+<!--
+Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<!--
+`core-menu` is a theme-aware selector.
+
+    <core-menu selected="0">
+      <core-item icon="settings" label="Settings"></core-item>
+      <core-item icon="dialog" label="Dialog"></core-item>
+      <core-item icon="search" label="Search"></core-item>
+    </core-menu>
+
+The `selectedItem` property references the selected item.
+
+    <core-menu selected="0" selectedItem="{{item}}">
+      <core-item icon="settings" label="Settings"></core-item>
+      <core-item icon="dialog" label="Dialog"></core-item>
+      <core-item icon="search" label="Search"></core-item>
+    </core-menu>
+
+    <div>selected label: {{item.label}}</div>
+
+The `core-select` event signals selection change.
+
+    <core-menu selected="0" on-core-select="{{selectAction}}">
+      <core-item icon="settings" label="Settings"></core-item>
+      <core-item icon="dialog" label="Dialog"></core-item>
+      <core-item icon="search" label="Search"></core-item>
+    </core-menu>
+
+    ...
+
+    selectAction: function(e, detail) {
+      if (detail.isSelected) {
+        var selectedItem = detail.item;
+        ...
+      }
+    }
+
+@group Polymer Core Elements
+@element core-menu
+@extends core-selector
+-->
+
+
+
+
+<polymer-element name="core-menu" extends="core-selector" attributes="theme" on-core-select="{{selectionChange}}" assetpath="../core-menu/">
+<template>
+
+  <style>/*
+Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+*/
+
+:host {
+  display: block;
+  box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  padding: 0.4em;
+  font-weight: bold;
+}
+
+:host(.core-light-theme) {
+  color: #333333;
+}
+
+:host(.core-dark-theme) {
+  background: -webkit-linear-gradient(-60deg, #3d3d3d, #353535);
+  background: -moz-linear-gradient(-60deg, #3d3d3d, #353535);
+  background: -ms-linear-gradient(-60deg, #3d3d3d, #353535);
+  color: #ededed;
+}
+</style>
+  <shadow></shadow>
 
 </template>
 <script>
 
-  Polymer('core-doc-viewer', {
+  Polymer('core-menu', Platform.mixin({
+
+    attached: function() {
+      this.validateTheme();
+    },
+
+    selectionChange: function(e, detail) {
+      if (detail.isSelected) {
+        var item = detail.item;
+        while (item.selectedItem) {
+          item = item.selectedItem;
+        }
+        this.selectedItem = item;
+      }
+    }
+
+  }, Polymer.ThemeAware));
+
+</script>
+</polymer-element>
+
+<!--
+Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+
+<!--
+@group Polymer Core Elements
+
+core-item is a simple line-item object: a label and/or an icon that can also act as a link.
+
+Example:
+
+     <core-item icon="settings" label="Settings"></core-item>
+
+@element core-item
+-->
+
+
+
+<polymer-element name="core-item" extends="core-theme-aware" attributes="src label icon item href" assetpath="../core-item/">
+<template>
+
+  <style>/*
+Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+*/
+
+:host {
+  display: block;
+  position: relative;
+  box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  height: 40px;
+  line-height: 35px;
+  font-size: 16px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0.5;
+}
+
+:host(:hover) {
+  opacity: 0.9;
+}
+
+:host(.core-selected, [active]) {
+  opacity: 1;
+}
+
+:host(.core-light-theme.core-selected, .core-light-theme[active]) {
+  background: #f2f2f2;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+:host(.core-dark-theme) {
+  color: #b3b3b3;
+}
+	
+:host(.core-dark-theme:hover) {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+:host(.core-dark-theme.core-selected, .core-dark-theme[active]) {
+  background-color: #000;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+:host([active].no-active-bg) {
+  background-color: transparent;
+  border: 1px solid transparent;
+}
+
+/* icon and label */
+
+core-icon:not([showing]) {
+  display: none !important;
+}
+
+core-icon {
+  vertical-align: middle;
+  margin-right: 16px;
+}
+
+#label {
+  vertical-align: middle;
+  padding-right: 20px;
+}
+
+/*@polyfill :host #label > a, #link */
+::content > a, #link {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  margin: -1px;
+}
+
+#link[hidden] {
+  display: none;
+}
+</style>
+
+  <core-icon src="{{src}}" icon="{{icon}}" showing?="{{icon || src}}"></core-icon>
+  <span id="label">{{label}}<content></content></span>
+  <a id="link" href="{{href}}" hidden?="{{!href}}"></a>
+
+</template>
+<script>
+
+  Polymer('core-item', {
     /**
+      * The URL of an image for the icon.
       *
-      * Set url to add documentation from that location to the view.
-      *
-      * @attribute url
-      * @type String
+      * @attribute src
+      * @type string
+      * @default ''
       */
 
-    sources: [],
-    data: null,
-    route: '',
-    layouts: {
-      open: [
-        [1, 2, 2]
-      ],
-      closed: [
-        [2, 2]
-      ],
-    },
-    navOpen: true,
+    /**
+      * Specifies the icon from the Polymer icon set.
+      *
+      * @attribute icon
+      * @type string
+      * @default ''
+      */
 
-    ready: function() {
-      this.classes = [];
-      // TODO(sjmiles): manual because flatiron-director didn't work, find out why
-      window.addEventListener('hashchange', this.parseLocationHash.bind(this));
-      this.parseLocationHash();
-      // TODO(sjmiles): improve method of configuring grid
-      this.$.grid.nodes = [this.$.navigation, this.$.docs];
-      this.$.grid.layout = this.layouts.open;
-      this.onMutation(this.$.docs, this.docsNodeChanged);
-    },
+    /**
+      * Specifies a link target.
+      *
+      * Example:
+      *
+      *     <core-item icon="favorite" label="Favorite" href="http://www.polymer-project.org/"></core-item>
+      *
+      * If you want more control on the link, e.g. specify the target for where to
+      * open the linked document, you can put &lt;a> directly inside the item.
+      *
+      * Example:
+      *
+      *     <core-item icon="favorite" label="Favorite">
+      *       <a href="http://www.polymer-project.org/" target="_self"></a>
+      *     </core-item>
+      *
+      * @attribute href
+      * @type string
+      * @default ''
+      */
 
-    parseLocationHash: function() {
-      this.route = window.location.hash.slice(1);
-    },
+    /**
+      * Specifies the label for the menu item.
+      *
+      * @attribute label
+      * @type string
+      * @default ''
+      */
+    label: '',
 
-    routeChanged: function() {
-      var anchor = this.shadowRoot.querySelector('a[id="' + this.route + '"]');
-      if (anchor) {
-        anchor.scrollIntoView();
+    // calc item's offset middle pos instead of using offsetTop/Height 
+    // directly which requires to wait for submenu's collapsing transition to 
+    // complete first before it can return the correct pos.
+    getOffsetMiddle: function() {
+      var p = this.parentNode;
+      if (p) {
+        var i = Array.prototype.indexOf.call(p.items, this);
+        var h = this.getItemHeight();
+        return i * h + h/2 + p.items[0].offsetTop;
       }
     },
 
-    toggleNav: function(event, detail, sender) {
-      this.navOpen = !this.navOpen;
-    },
-
-    navOpenChanged: function() {
-      this.effectLayout();
-    },
-
-    effectLayout: function() {
-      this.$.grid.layout = this.navOpen ? this.layouts.open : this.layouts.closed;
-      this.$.fixed.style.left = this.navOpen ? this.fixedLeft + 'px' : '0px';
-    },
-
-    gridLayout: function() {
-      // TODO(sjmiles): the 'fixed' header bar is relative to the screen
-      // to position it dynamically we need to know offsetLeft of the
-      // docs panel after the first layout.
-      if (!this.fixedLeft) {
-        this.fixedLeft = this.$.docs.offsetLeft;
-        this.$.fixed.style.display = 'block';
-        this.effectLayout();
-      }
-      this.$.docs.classList.add('animate');
-      this.$.fixed.classList.add('animate');
-    },
-
-    hilight: function(event, detail, sender) {
-      detail.code = hljs.highlightAuto(detail.code).value;
-    },
-
-    docsNodeChanged: function(observer) {
-      this.$.docs.scrollTop = 0;
-      this.docsScroll();
-      this.onMutation(this.$.docs, this.docsNodeChanged);
-    },
-
-    docsScroll: function() {
-      var t = this.$.docs.scrollTop + 80;
-      var hcs = this.$.docsInner.querySelectorAll('.topic');
-      for (var i = 0, hc; hc = hcs[i]; i++) {
-        if (t >= hc.offsetTop && (!hcs[i+1] || t < hcs[i+1].offsetTop)) {
-          var h = hc.querySelector('.element');
-          if (h) {
-            this.$.fixedTopic.innerText = h.innerText;
-          }
-          return;
-        }
-      }
-    },
-
-    parserDataReady: function(event) {
-      this.assimilateData(event.target.data);
-    },
-
-    dataChanged: function() {
-      this.assimilateData(this.data);
-    },
-
-    assimilateData: function(data) {
-      this.classes = this.classes.concat(data.classes);
-      this.classes.sort(function(a, b) {
-        var na = a.name.toLowerCase(), nb = b.name.toLowerCase();
-        return (na < nb) ? -1 : (na == nb) ? 0 : 1;
-      });
+    getItemHeight: function() {
+      return this.offsetHeight;
     }
 
   });
@@ -5555,6 +5964,177 @@ a {
 </script>
 </polymer-element>
 
+
+
+
+
+
+
+
+<!--
+@class core-doc-toc
+-->
+
+<polymer-element name="core-doc-toc" attributes="data selected" assetpath="../core-doc-viewer/elements/">
+
+  <template>
+
+    <style>:host {
+  display: block;
+  border-right: 1px solid silver;
+}
+
+core-header-panel {
+  height: 100%;
+}
+
+core-toolbar {
+  background-color: #E91E63;
+  color: white;
+}
+</style>
+
+    <core-header-panel mode="waterfall">
+
+      <core-toolbar theme="core-light-theme">
+        <core-icon-button icon="menu"></core-icon-button>
+        <span core-flex="">Topics</span>
+        <core-icon-button icon="search" on-tap="{{searchAction}}"></core-icon-button>
+      </core-toolbar>
+
+      <core-toolbar id="searchBar" style="background-color: #C2185B; position: absolute; top: 0; left: 0; right: 0; opacity: 0; display: none;" class="seamed" theme="core-dark-theme">
+        <core-icon-button icon="search"></core-icon-button>
+        <core-icon-button icon="close" on-tap="{{closeSearchAction}}"></core-icon-button>
+      </core-toolbar>
+
+      <core-menu selected="{{selected}}">
+        <template repeat="{{data}}">
+          <core-item><a href="#{{name}}">{{name}}</a></core-item>
+        </template>
+      </core-menu>
+
+    </core-header-panel>
+
+  </template>
+
+  <script>
+
+    Polymer('core-doc-toc', {
+
+      searchAction: function() {
+        this.$.searchBar.style.opacity = 1;
+        this.$.searchBar.style.display = '';
+      },
+
+      closeSearchAction: function() {
+        this.$.searchBar.style.opacity = 0;
+        this.$.searchBar.style.display = 'none';
+      }
+
+    });
+
+  </script>
+
+</polymer-element>
+
+
+
+
+
+<!--
+Displays formatted source documentation scraped from input urls.
+
+@class core-doc-viewer
+-->
+
+<polymer-element name="core-doc-viewer" attributes="sources route url" assetpath="../core-doc-viewer/">
+
+  <template>
+
+    <style>
+      :host {
+        display: block;
+        position: relative;
+      }
+      core-doc-toc {
+        width: 332px;
+        overflow-x: hidden;
+      }
+      core-doc-page {
+        height: 100%;
+      }
+    </style>
+
+    <context-free-parser url="{{url}}" on-data-ready="{{parserDataReady}}"></context-free-parser>
+
+    <template repeat="{{sources}}">
+      <context-free-parser url="{{}}" on-data-ready="{{parserDataReady}}"></context-free-parser>
+    </template>
+
+    <core-layout core-fit="">
+      <core-doc-toc data="{{classes}}" selected="{{selected}}"></core-doc-toc>
+      <core-doc-page core-flex="" data="{{data}}"></core-doc-page>
+    </core-layout>
+
+  </template>
+
+  <script>
+
+    Polymer('core-doc-viewer', {
+
+      classes: [],
+      sources: [],
+
+      ready: function() {
+        window.addEventListener('hashchange', this.parseLocationHash.bind(this));
+        this.parseLocationHash();
+      },
+
+      parseLocationHash: function() {
+        this.route = window.location.hash.slice(1);
+      },
+
+      routeChanged: function() {
+        this.validateRoute();
+      },
+
+      validateRoute: function() {
+        if (this.route) {
+          this.classes.some(function(c) {
+            if (c.name === this.route) {
+              this.data = c;
+              this.route = '';
+              return;
+            }
+          }, this);
+        }
+      },
+
+      selectedChanged: function() { 
+        this.data = this.classes[this.selected];
+      },
+
+      parserDataReady: function(event) {
+        this.assimilateData(event.target.data);
+      },
+
+      assimilateData: function(data) {
+        this.classes = this.classes.concat(data.classes);
+        this.classes.sort(function(a, b) {
+          var na = a && a.name.toLowerCase(), nb = b && b.name.toLowerCase();
+          return (na < nb) ? -1 : (na == nb) ? 0 : 1;
+        });
+        if (!this.data && !this.route && this.classes.length) {
+          this.data = this.classes[0];
+        }
+        this.validateRoute();
+      }
+
+    });
+
+  </script>
+
+</polymer-element>
 ﻿<!--
 Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
 This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
