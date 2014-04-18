@@ -2,7 +2,8 @@
   "name": "core-component-page",
   "private": true,
   "dependencies": {
-    "platform": "Polymer/platform#master",
-    "core-action-icons": "Polymer/core-action-icons#master"
-  }
+    "platform": "Polymer/platform#0.2.3",
+    "core-action-icons": "Polymer/core-action-icons#0.2.3"
+  },
+  "version": "0.2.3"
 }
