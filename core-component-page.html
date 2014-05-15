@@ -688,6 +688,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
  *     iconset.applyIcon(iconNode, 'car');
  *
  * @element core-iconset-svg
+ * @extends core-meta
  * @homepage github.io
  */
 -->
@@ -747,6 +748,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
  *     iconset.applyIcon(iconNode, 'car', 'special');
  *
  * @element core-iconset
+ * @extends core-meta
  * @homepage github.io
  */
 -->
@@ -1058,10 +1060,11 @@ Example:
          var offset = this.getOffset(icon, theme);
          scale = scale || 1;
          if (element && offset) {
-           element.style.backgroundImage = 'url(' + this.src + ')';
-           element.style.backgroundPosition = (-offset.offsetX * scale + 'px') + 
+           var style = element.style;
+           style.backgroundImage = 'url(' + this.src + ')';
+           style.backgroundPosition = (-offset.offsetX * scale + 'px') + 
               ' ' + (-offset.offsetY * scale + 'px');
-           element.style.backgroundSize = scale === 1 ? 'auto' :
+           style.backgroundSize = scale === 1 ? 'auto' :
               this.width * scale + 'px';
          }
       }
@@ -1109,8 +1112,17 @@ Example:
       },
 
       get iconNames() {
+        if (!this._iconNames) {
+          this._iconNames = this.findIconNames();
+        }
+        return this._iconNames;
+      },
+
+      findIconNames: function() {
         var icons = this.querySelectorAll('[id]').array();
-        return icons.map(function(n){ return n.id });
+        if (icons.length) {
+          return icons.map(function(n){ return n.id });
+        }
       },
 
       /**
@@ -1131,8 +1143,13 @@ Example:
         }
         // install new
         var svg = this.cloneIcon(icon);
+        if (!svg) {
+          return;
+        }
+        svg.style.height = svg.style.width = this.iconSize + 'px';
+        svg.style.verticalAlign = 'middle';
         if (svg) {
-          root.appendChild(svg);
+          root.insertBefore(svg, root.firstElementChild);
         }
       }
     });
@@ -1141,9 +1158,19 @@ Example:
 
 </polymer-element>
 
-
 <core-iconset-svg id="icons" iconsize="24">
 <svg><defs>
+<g id="language">
+	<g>
+		<rect y="0" fill="none" width="24" height="24"></rect>
+		<path d="M12,2C6.5,2,2,6.5,2,12s4.5,10,10,10c5.5,0,10-4.5,10-10S17.5,2,12,2z M18.9,8H16c-0.3-1.3-0.8-2.4-1.4-3.6
+			C16.4,5.1,18,6.3,18.9,8z M12,4c0.8,1.2,1.5,2.5,1.9,4h-3.8C10.5,6.6,11.2,5.2,12,4z M4.3,14C4.1,13.4,4,12.7,4,12s0.1-1.4,0.3-2
+			h3.4c-0.1,0.7-0.1,1.3-0.1,2s0.1,1.3,0.1,2H4.3z M5.1,16H8c0.3,1.3,0.8,2.4,1.4,3.6C7.6,18.9,6,17.7,5.1,16z M8,8H5.1
+			c1-1.7,2.5-2.9,4.3-3.6C8.8,5.6,8.3,6.7,8,8z M12,20c-0.8-1.2-1.5-2.5-1.9-4h3.8C13.5,17.4,12.8,18.8,12,20z M14.3,14H9.7
+			c-0.1-0.7-0.2-1.3-0.2-2s0.1-1.3,0.2-2h4.7c0.1,0.7,0.2,1.3,0.2,2S14.4,13.3,14.3,14z M14.6,19.6c0.6-1.1,1.1-2.3,1.4-3.6h2.9
+			C18,17.7,16.4,18.9,14.6,19.6z M16.4,14c0.1-0.7,0.1-1.3,0.1-2s-0.1-1.3-0.1-2h3.4c0.2,0.6,0.3,1.3,0.3,2s-0.1,1.4-0.3,2H16.4z"></path>
+	</g>
+</g>
 <g id="label">
 	<g>
 		<rect fill="none" width="24" height="24"></rect>
@@ -1272,6 +1299,12 @@ Example:
 		<rect x="0" fill="none" width="24" height="24"></rect>
 	</g>
 </g>
+<g id="accessibility">
+	<g>
+		<rect y="0" fill="none" width="24" height="24"></rect>
+		<path d="M12,2c1.1,0,2,0.9,2,2s-0.9,2-2,2s-2-0.9-2-2S10.9,2,12,2z M21,9h-6v13h-2v-6h-2v6H9V9H3V7h18V9z"></path>
+	</g>
+</g>
 <g id="lock">
 	<g>
 		<rect fill="none" width="24" height="24"></rect>
@@ -1338,6 +1371,18 @@ Example:
 		<rect fill="none" width="24" height="24"></rect>
 	</g>
 </g>
+<g id="settings-applications">
+	<g>
+		<rect y="0" fill="none" width="24" height="24"></rect>
+		<path d="M12,10c-1.1,0-2,0.9-2,2s0.9,2,2,2s2-0.9,2-2S13.1,10,12,10z M19,3H5C3.9,3,3,3.9,3,5v14c0,1.1,0.9,2,2,2h14
+			c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3z M17.2,12c0,0.2,0,0.5,0,0.7l1.5,1.2c0.1,0.1,0.2,0.3,0.1,0.4l-1.4,2.4
+			c-0.1,0.2-0.3,0.2-0.4,0.2l-1.7-0.7c-0.4,0.3-0.8,0.5-1.2,0.7l-0.3,1.9c0,0.2-0.2,0.3-0.3,0.3h-2.8c-0.2,0-0.3-0.1-0.3-0.3
+			L10,16.9c-0.4-0.2-0.8-0.4-1.2-0.7l-1.7,0.7c-0.2,0.1-0.3,0-0.4-0.2l-1.4-2.4c-0.1-0.2,0-0.3,0.1-0.4l1.5-1.2c0-0.2,0-0.5,0-0.7
+			s0-0.5,0-0.7l-1.5-1.2c-0.1-0.1-0.2-0.3-0.1-0.4l1.4-2.4c0.1-0.2,0.3-0.2,0.4-0.2l1.7,0.7C9.2,7.6,9.6,7.3,10,7.1l0.3-1.9
+			c0-0.2,0.2-0.3,0.3-0.3h2.8c0.2,0,0.3,0.1,0.3,0.3L14,7.1c0.4,0.2,0.8,0.4,1.2,0.7l1.7-0.7c0.2-0.1,0.3,0,0.4,0.2l1.4,2.4
+			c0.1,0.2,0,0.3-0.1,0.4l-1.5,1.2C17.2,11.5,17.2,11.8,17.2,12z"></path>
+	</g>
+</g>
 <g id="delete">
 	<g>
 		<g>
@@ -1351,6 +1396,16 @@ Example:
 		<rect fill="none" width="24" height="24"></rect>
 		<path d="M10.1,15.6l1.4,1.4l5-5l-5-5l-1.4,1.4l2.6,2.6H3v2h9.7L10.1,15.6z M19,3H5C3.9,3,3,3.9,3,5v4h2V5h14v14H5v-4H3v4
 			c0,1.1,0.9,2,2,2h14c1.1,0,2-0.9,2-2V5C21,3.9,20.1,3,19,3z"></path>
+	</g>
+</g>
+<g id="credit-card">
+	<g>
+		<rect fill="none" width="24" height="24"></rect>
+		<g>
+			<rect x="4" y="12" fill="#FFFFFF" width="16" height="6"></rect>
+		</g>
+		<path d="M20,4H4C2.9,4,2,4.9,2,6l0,12c0,1.1,0.9,2,2,2h16c1.1,0,2-0.9,2-2V6C22,4.9,21.1,4,20,4z M20,18H4v-6h16V18z M20,8H4V6h16
+			V8z"></path>
 	</g>
 </g>
 <g id="account-circle">
@@ -1394,6 +1449,13 @@ Example:
 	<g>
 		<rect fill="none" width="24" height="24"></rect>
 		<path d="M18,22c1.1,0,2-0.9,2-2V4c0-1.1-0.9-2-2-2h-6v7L9.5,7.5L7,9V2H6C4.9,2,4,2.9,4,4v16c0,1.1,0.9,2,2,2H18z"></path>
+	</g>
+</g>
+<g id="backup">
+	<g>
+		<rect fill="none" width="24" height="24"></rect>
+		<path d="M19.4,10c-0.7-3.4-3.7-6-7.4-6C9.1,4,6.6,5.6,5.4,8C2.3,8.4,0,10.9,0,14c0,3.3,2.7,6,6,6h13c2.8,0,5-2.2,5-5
+			C24,12.4,21.9,10.2,19.4,10z M14,13v4h-4v-4H7l5-5l5,5H14z"></path>
 	</g>
 </g>
 <g id="google-plus">
@@ -1626,6 +1688,16 @@ Example:
 		<path d="M16.9,13c1.3-1.3,2.1-3,2.1-5c0-3.9-3.1-7-7-7C8.1,1,5,4.1,5,8c0,2,0.8,3.7,2.1,5l0,0l3.5,3.5L6,21.1l1.4,1.4L16.9,13z
 			 M15.5,11.5L15.5,11.5L12,15.1l-3.5-3.5l0,0l0,0C7.6,10.6,7,9.4,7,8c0-2.8,2.2-5,5-5c2.8,0,5,2.2,5,5C17,9.4,16.4,10.6,15.5,11.5
 			L15.5,11.5z M13.4,19.3l3.2,3.2l1.4-1.4l-3.2-3.2L13.4,19.3z"></path>
+	</g>
+</g>
+<g id="bug-report">
+	<g>
+		<g>
+			<rect fill="none" width="24" height="24"></rect>
+		</g>
+		<path d="M20,8h-2.8c-0.5-0.8-1.1-1.5-1.8-2L17,4.4L15.6,3l-2.2,2.2C13,5.1,12.5,5,12,5s-1,0.1-1.4,0.2L8.4,3L7,4.4L8.6,6
+			C7.9,6.5,7.3,7.2,6.8,8H4v2h2.1C6,10.3,6,10.7,6,11v1H4v2h2v1c0,0.3,0,0.7,0.1,1H4v2h2.8c1,1.8,3,3,5.2,3s4.2-1.2,5.2-3H20v-2
+			h-2.1c0.1-0.3,0.1-0.7,0.1-1v-1h2v-2h-2v-1c0-0.3,0-0.7-0.1-1H20V8z M14,16h-4v-2h4V16z M14,12h-4v-2h4V12z"></path>
 	</g>
 </g>
 <g id="work">
@@ -2410,34 +2482,10 @@ Example:
 </defs></svg>
 </core-iconset-svg>
 
-
-<!--
-Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
-This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE
-The complete set of authors may be found at http://polymer.github.io/AUTHORS
-The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS
-Code distributed by Google as part of the polymer project is also
-subject to an additional IP rights grant found at http://polymer.github.io/PATENTS
+<!-- import core-icon for convenience 
+  TODO(sorvell): we'd rather do this in core-iconset but we can't until
+  crbug.com/373461 is addressed
 -->
-
-<!--
-`core-icon-button` is an icon with button behaviors.
-
-    <core-icon-button src="star.png"></core-icon-button>
-
-`core-icon-button` includes a default icon set.  Use `icon` to specify 
-which icon from the icon set to use.
-
-    <core-icon-button icon="menu"></core-icon-button>
-
-See <a href="core-iconset.html">core-iconset</a> for more information about 
-how to use a custom icon set.
-
-@group Polymer Core Elements
-@element core-icon-button
-@homepage github.io
--->
-
 <!--
 Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
 This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
@@ -2466,58 +2514,114 @@ Example using icon `cherry` from custom iconset `fruit`:
 
     <core-icon icon="fruit:cherry"></core-icon>
 
-See <a href="#core-iconset">core-iconset</a> for more information about 
+See [core-iconset](#core-iconset) and [core-iconset-svg](#core-iconset-svg) for more information about
 how to use a custom iconset.
 
-The default set of includes these icons:
-
-<div theme="core-light-theme">
-  <core-icon icon="drawer"></core-icon> drawer,
-  <core-icon icon="menu"></core-icon> menu,
-  <core-icon icon="search"></core-icon> search,
-  <core-icon icon="dropdown"></core-icon> dropdown,
-  <core-icon icon="close"></core-icon> close,
-  <core-icon icon="add"></core-icon> add,
-  <core-icon icon="trash"></core-icon> trash,
-  <core-icon icon="refresh"></core-icon> refresh,
-  <core-icon icon="settings"></core-icon> settings,
-  <core-icon icon="dialoga"></core-icon> dialoga,
-  <core-icon icon="left"></core-icon> left,
-  <core-icon icon="right"></core-icon> right,
-  <core-icon icon="down"></core-icon> down,
-  <core-icon icon="up"></core-icon> up,
-  <core-icon icon="grid"></core-icon> grid,
-  <core-icon icon="contact"></core-icon> contact,
-  <core-icon icon="account"></core-icon> account,
-  <core-icon icon="plus"></core-icon> plus,
-  <core-icon icon="time"></core-icon> time,
-  <core-icon icon="marker"></core-icon> marker,
-  <core-icon icon="briefcase"></core-icon> briefcase,
-  <core-icon icon="array"></core-icon> array,
-  <core-icon icon="columns"></core-icon> columns,
-  <core-icon icon="list"></core-icon> list,
-  <core-icon icon="modules"></core-icon> modules,
-  <core-icon icon="quilt"></core-icon> quilt,
-  <core-icon icon="stream"></core-icon> stream,
-  <core-icon icon="maximize"></core-icon> maximize,
-  <core-icon icon="shrink"></core-icon> shrink,
-  <core-icon icon="sort"></core-icon> sort,
-  <core-icon icon="shortcut"></core-icon> shortcut,
-  <core-icon icon="dialog"></core-icon> dialog,
-  <core-icon icon="twitter"></core-icon> twitter,
-  <core-icon icon="facebook"></core-icon> facebook,
-  <core-icon icon="favorite"></core-icon> favorite,
-  <core-icon icon="gplus"></core-icon> gplus,
-  <core-icon icon="filter"></core-icon> filter,
-  <core-icon icon="tag"></core-icon> tag,
-  <core-icon icon="plusone"></core-icon> plusone,
-  <core-icon icon="dots"></core-icon> dots,
-</div>
+See [core-icons](#core-icons) for the default set of icons.
 
 @group Polymer Core Elements
 @element core-icon
+@extends core-theme-aware
 @homepage github.io
 -->
+
+
+<style shim-shadowdom="">/* Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt */
+
+html /deep/ core-icon {
+  display: inline-block;
+  vertical-align: middle;
+  background-repeat: no-repeat;
+}
+</style>
+
+<polymer-element name="core-icon" attributes="src size icon" assetpath="../core-icon/">
+<script>
+(function() {
+  
+  // mono-state
+  var meta;
+  
+  Polymer('core-icon', {
+
+    /**
+     * The URL of an image for the icon. If the src property is specified,
+     * the icon property should not be.
+     *
+     * @attribute src
+     * @type string
+     * @default ''
+     */
+    src: '',
+
+    /**
+     * Specifies the size of the icon in pixel units.
+     *
+     * @attribute size
+     * @type string
+     * @default 24
+     */
+    size: 24,
+
+    /**
+     * Specifies the icon name or index in the set of icons available in
+     * the icon's icon set. If the icon property is specified,
+     * the src property should not be.
+     *
+     * @attribute icon
+     * @type string
+     * @default ''
+     */
+    icon: '',
+
+    defaultIconset: 'icons',
+
+    ready: function() {
+      if (!meta) {
+        meta = document.createElement('core-iconset');
+      }
+      this.sizeChanged();
+    },
+
+    sizeChanged: function() {
+      this.style.width = this.style.height = this.size + 'px';
+    },
+
+    srcChanged: function() {
+      this.style.backgroundImage = 'url(' + this.src + ')';
+      this.style.backgroundPosition = 'center';
+      this.style.backgroundSize = this.size + 'px ' + this.size + 'px';
+    },
+
+    getIconset: function(name) {
+      return meta.byId(name || this.defaultIconset);
+    },
+
+    iconChanged: function() {
+      if (this.icon) {
+        var parts = String(this.icon).split(':');
+        var icon = parts.pop();
+        if (icon) {
+          var set = this.getIconset(parts.pop());
+          if (set) {
+            set.applyIcon(this, icon, this.activeTheme, this.size / set.iconSize);
+          }
+        }
+      }
+    }
+
+  });
+  
+})();
+</script>
+
+</polymer-element>
+
 
 <!--
 Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
@@ -2529,305 +2633,25 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 -->
 
 <!--
+`core-icon-button` is an icon with button behaviors.
+
+    <core-icon-button src="star.png"></core-icon-button>
+
+`core-icon-button` includes a default icon set.  Use `icon` to specify 
+which icon from the icon set to use.
+
+    <core-icon-button icon="menu"></core-icon-button>
+
+See [`core-iconset`](#core-iconset) for more information about 
+how to use a custom icon set.
+
 @group Polymer Core Elements
-
-The `core-theme-aware` element is a base element which can be 
-extended to create elements that can support theming. This element applies
-no styling itself; instead it allows the author to create styles that 
-apply known themes.
-
-The user of a theme-aware element can set a `theme` attribute anywhere 
-in the dom tree containing the element, ShadowDOM inclusive. The theme-aware
-element simply ensures that the element has the appropriate theme class. This
-theme class corresponds to the theme attribute.
-
-This means an author can create a set of elements that support a particular
-theme, and the user of that set can, for example, set a theme attribute
-on the body element to apply that theme inside the body element. The 
-`core-theme-aware` element also supports nested theming. For example,
-the body element might be given theme="standard" but a particuarly subtree
-could be given a theme="different".
-
-`core-theme-aware` uses the [Polymer.ThemeAware](#Polymer.ThemeAware) mixin.
-
-Example:
-
-    <body theme="pretty">
-
-      <core-theme-aware> 
-        auto-styled with class="pretty" as a result of the containing theme
-      <core-theme-aware>
-
-      <section theme="different">
-
-        <core-theme-aware> 
-          auto-styled with class="different" as a result of the containing theme
-        <core-theme-aware>
-
-      </section>
-
-    </body>
-
-@class core-theme-aware
-@status beta
+@element core-icon-button
+@extends core-theme-aware
 @homepage github.io
-
--->
-
-<!--
- // NOTE: Polymer.ThemeAware methods separately documented so they can be part
- // of core-theme-aware.
- /**
-   * When no theme is specified, the value `defaultTheme` will be applied
-   * as the theme class.
-   * This is not typically intended for a user to set but is 
-   * useful in an element that extends `core-theme-aware`.
-   * 
-   * @attribute defaultTheme
-   * @type string
-   * @default ''
-   */
-
-  /**
-   * The `activeTheme` property stores the current theme. When the activeTheme
-   * changes, the element's theme class is updated. An element can 
-   * implement the `activeThemeChanged` method to do processing when the
-   * theme changes.
-   *
-   * This is not typically intended for a user to set but is 
-   * useful in an element that extends `core-theme-aware`.
-   * 
-   * @attribute activeTheme
-   * @type string
-   * @default ''
-   */
-
-  /**
-   * The theme set by the user of the theme-aware element. The `theme`
-   * property will only be set if the user has specifically given the
-   * theme-aware element a theme attribute.
-   *
-   * @attribute theme
-   * @type string
-   * @default ''
-   */
 -->
 
 
-<polymer-element name="core-theme-aware" attributes="theme" assetpath="../core-theme-aware/">
-
-  <script>
-    /**
-     * `Polymer.ThemeAware` is a helper class that can be used to mixin basic
-     * theme-aware capability to an element which cannot extend from 
-     * `core-theme-aware` because it extends from another element.
-     * The `Platform.mixin` method can be used to mixin theme aware capability
-     * into an element's prototype. Here's an example:
-     * 
-     *     Polymer('my-element', Platform.mixin({
-     *
-     *       // my-element's properties and methods
-     *       foo: 'foo',
-     *
-     *       // be sure to call the validateTheme method in the attached method
-     *       // to initialize the theme.
-     *       attached: function() {
-     *         this.validateTheme();
-     *       }
-     *
-     *     }, Polymer.ThemeAware));
-     *
-     * @class Polymer.ThemeAware
-     */
-    Polymer.ThemeAware = {
-
-      /**
-       * When no theme is specified, the value `defaultTheme` will be applied
-       * as the theme class.
-       * This is not typically intended for a user to set but is 
-       * useful in an element that extends `core-theme-aware`.
-       * 
-       * @attribute defaultTheme
-       * @type string
-       * @default ''
-       */
-      defaultTheme: '',
-
-      // TODO(sorvell): activeTheme exists so that we do not always serialize
-      // the theme property. This could be addressed instead via the serialize
-      // block (tbd) like this: serialize: {theme: false}. One issue with this
-      // approach, however, is that if Platform.mixin is used to supply 
-      // Polymer.ThemeAware, it will overwrite the existing serialize block.
-      // Perhaps Platform.mixin should also mixin sub-objects?
-      
-      /**
-       * The `activeTheme` property stores the current theme. When the activeTheme
-       * changes, the element's theme class is updated. An element can 
-       * implement the `activeThemeChanged` method to do processing when the
-       * theme changes.
-       *
-       * This is not typically intended for a user to set but is 
-       * useful in an element that extends `core-theme-aware`.
-       * 
-       * @attribute activeTheme
-       * @type string
-       * @default ''
-       */
-      activeTheme: '',
-
-      /**
-       * The theme set by the user of the theme-aware element. The `theme`
-       * property will only be set if the user has specifically given the
-       * theme-aware element a theme attribute.
-       *
-       * @attribute theme
-       * @type string
-       * @default ''
-       */
-      theme: '',
-
-      /**
-       * 
-       *
-       * @method validateTheme
-       */
-      validateTheme: function() {
-        var theme = this.theme;
-        var defaultTheme = this.defaultTheme;
-        if (!theme) {
-          var p = this;
-          while (p && !theme) {
-            theme = p.getAttribute && p.getAttribute('theme');
-            defaultTheme = defaultTheme || p.defaultTheme;
-            p = p.parentNode || p.host;
-          }
-        }
-        this.activeTheme = this.theme || theme || defaultTheme;
-      },
-
-      themeChanged: function() {
-        this.activeTheme = this.theme;
-      },
-
-      activeThemeChanged: function(old) {
-        this.classList.switch(old, this.activeTheme);
-      }
-      
-    };
-
-    Polymer('core-theme-aware', Platform.mixin({
-
-      attached: function() {
-        this.validateTheme();
-      }
-
-    }, Polymer.ThemeAware));
-
-  </script>
-
-</polymer-element>
-
-
-
-<polymer-element name="core-icon" extends="core-theme-aware" attributes="src size icon" assetpath="../core-icon/">
-
-  <template>
-
-    <style>/* Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
-This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
-The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
-The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
-Code distributed by Google as part of the polymer project is also
-subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt */
-
-:host {
-  display: inline-block;
-  vertical-align: middle;
-  background-repeat: no-repeat;
-}
-</style>
-    <core-iconset id="meta"></core-iconset>
-    <content></content>
-
-  </template>
-
-  <script>
-
-    Polymer('core-icon', {
-
-      /**
-       * The URL of an image for the icon. If the src property is specified,
-       * the icon property should not be.
-       *
-       * @attribute src
-       * @type string
-       * @default ''
-       */
-      src: '',
-
-      /**
-       * Specifies the size of the icon in pixel units.
-       *
-       * @attribute size
-       * @type string
-       * @default 24
-       */
-      size: 24,
-
-      /**
-       * Specifies the icon name or index in the set of icons available in
-       * the icon's icon set. If the icon property is specified,
-       * the src property should not be.
-       *
-       * @attribute icon
-       * @type string
-       * @default ''
-       */
-      icon: '',
-
-      defaultIconset: 'icons',
-
-      observe: {
-        icon: 'updateIcon',
-        activeTheme: 'updateIcon'
-      },
-
-      ready: function() {
-        this.sizeChanged();
-      },
-
-      sizeChanged: function() {
-        this.style.width = this.style.height = this.size + 'px';
-      },
-
-      srcChanged: function() {
-        this.style.backgroundImage = 'url(' + this.src + ')';
-        this.style.backgroundPosition = 'center';
-        this.style.backgroundSize = this.size + 'px ' + this.size + 'px';
-      },
-
-      getIconset: function(name) {
-        return this.$.meta.byId(name || this.defaultIconset);
-      },
-
-      updateIcon: function() {
-        if (!(this.icon && typeof this.icon === 'string')) {
-          return;
-        }
-        var parts = this.icon.split(':');
-        var icon = parts.pop();
-        var set = this.getIconset(parts.pop());
-        if (set && icon) {
-          var scale = this.size / set.iconSize;
-          set.applyIcon(this, icon, this.activeTheme, scale);
-        }
-      }
-
-    });
-
-  </script>
-
-</polymer-element>
 
 
 <polymer-element name="core-icon-button" extends="core-theme-aware" attributes="src icon active" assetpath="../core-icon-button/">
@@ -2854,6 +2678,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   padding: 7px;
   margin: 2px;
   vertical-align: middle;
+  font-size: 1rem;
   cursor: pointer;
 }
 
@@ -2896,8 +2721,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 }
 
 core-icon {
-  display: block;
-  vertical-align: middle;
+  pointer-events: none;
 }
 </style>
 
@@ -2961,11 +2785,13 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 <!--
 `core-toolbar` is a horizontal bar containing elements that can be used for
-label, navigation, search and actions.
+label, navigation, search and actions. It extends [core-theme-aware](../core-theme-aware).
+
+<b>Example:</b>
 
     <core-toolbar>
       <core-icon-button icon="menu" on-tap="{{menuAction}}"></core-icon-button>
-      <div core-flex>Title</div>
+      <div flex>Title</div>
       <core-icon-button icon="more" on-tap="{{moreAction}}"></core-icon-button>
     </core-toolbar>
 
@@ -2991,12 +2817,13 @@ When taller, actions can pin to either the top (default), middle or bottom.
 
 @group Polymer Core Elements
 @element core-toolbar
+@extends core-theme-aware
 @homepage github.io
 -->
 
 
 
-<polymer-element name="core-toolbar" extends="core-theme-aware" assetpath="../core-toolbar/">
+<polymer-element name="core-toolbar" noscript="" assetpath="../core-toolbar/">
 <template>
 
   <style>/*
@@ -3017,13 +2844,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   /* size */
   height: 64px;
   /* typography */
-  font-size: 21px;
+  font-size: 1.3em;
   /* transition */
-  transition: height ease-in 0.18s;
-}
-
-:host(.core-dark-theme) {
-  color: #eee;
+  transition: height 0.18s ease-in;
 }
 
 :host(.medium-tall) {
@@ -3034,20 +2857,40 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   height: 192px;
 }
 
-.toolbar-tools, .toolbar-tools-middle, .toolbar-tools-bottom {
+.toolbar-tools {
   height: 64px;
   padding: 0 9px;
 }
 
-.toolbar-tools-middle {
+/* narrow layout */
+:host(.narrow) {
+  height: 56px;
+}
+
+:host(.narrow.medium-tall) {
+  height: 112px;
+}
+
+:host(.narrow.tall) {
+  height: 168px;
+}
+
+:host(.narrow) .toolbar-tools {
+  height: 56px;
+  padding: 0 1px;
+}
+
+/* middle bar */
+#middleBar {
   position: absolute;
-  top: calc(50% - 30px);
+  top: calc(100% / 3);
   right: 0;
   left: 0;
   pointer-events: none;
 }
 
-.toolbar-tools-bottom {
+/* bottom bar */
+#bottomBar {
   position: absolute;
   right: 0;
   bottom: 0;
@@ -3055,12 +2898,29 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   pointer-events: none;
 }
 
-/*@polyfill :host > .toolbar-tools-middle > *, :host > .toolbar-tools-bottom > * */
+/* shows bottom bar only when in normal height (!tall && !medium-tall) */
+:host(.no-overlap) > #topBar, 
+:host(.no-overlap) > #middleBar {
+  transition: -webkit-transform 0.18s ease-in;
+  transition: transform 0.18s ease-in;
+}
+
+:host(.no-overlap:not(.medium-tall):not(.tall)) > #topBar {
+  -webkit-transform: translateY(-100%);
+  transform: translateY(-100%);
+}
+
+:host(.no-overlap:not(.medium-tall):not(.tall)) > #middleBar {
+  -webkit-transform: translateY(-200%);
+  transform: translateY(-200%);
+}
+
+/*@polyfill :host > #middleBar > *, :host > #bottomBar > * */
 ::content[select=".middle"] > *, ::content[select=".bottom"] > * {
   pointer-events: visible;
 }
 
-/*@polyfill :host > .toolbar-tools > *, :host > .toolbar-tools-middle > *, :host > .toolbar-tools-bottom > * */
+/*@polyfill :host > .toolbar-tools > * */
 ::content > * {
   margin: 0px 8px;
 }
@@ -3080,246 +2940,20 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   margin-left: 60px;
 }
 </style>
-  <style>/*
-Copyright 2013 The Polymer Authors. All rights reserved.
-Use of this source code is governed by a BSD-style
-license that can be found in the LICENSE file.
-*/
 
-.core-h, .core-v {
-  display: -webkit-box !important;
-  display: -ms-flexbox !important;
-  display: -moz-flex !important;
-  display: -webkit-flex !important;
-  display: flex !important;
-}
-
-.core-h {
-  -webkit-box-orient: horizontal;
-  -ms-flex-direction: row;
-  -moz-flex-direction: row;
-  -webkit-flex-direction: row;
-  flex-direction: row;
-}
-
-.core-h.core-reverse {
-  -webkit-box-direction: reverse;
-  -ms-flex-direction: row-reverse;
-  -moz-flex-direction: row-reverse;
-  -webkit-flex-direction: row-reverse;
-  flex-direction: row-reverse;
-}
-
-.core-v {
-  -webkit-box-orient: vertical;
-  -ms-flex-direction: column;
-  -moz-flex-direction: column;
-  -webkit-flex-direction: column;
-  flex-direction: column;
-}
-
-.core-v.core-reverse {
-  -webkit-box-direction: reverse;
-  -ms-flex-direction: column-reverse;
-  -moz-flex-direction: column-reverse;
-  -webkit-flex-direction: column-reverse;
-  flex-direction: column-reverse;
-}
-
-.core-relative {
-  position: relative;
-}
-
-.core-fit {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  width: 100%;
-}
-
-body.core-fit {
-  margin: 0;
-}
-
-.core-flex, [core-flex] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1;
-  -moz-flex: 1;
-  -webkit-flex: 1;
-  flex: 1;
-}
-
-.core-flex-auto, [core-flex-auto] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1 1 auto;
-  -moz-flex: 1 1 auto;
-  -webkit-flex: 1 1 auto;
-  flex: 1 1 auto;
-}
-
-.core-flex-none, [core-flex-none] {
-  -webkit-box-flex: none;
-  -ms-flex: none;
-  -moz-flex: none;
-  -webkit-flex: none;
-  flex: none;
-}
-
-.core-flex1, [core-flex=1] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1;
-  -moz-flex: 1;
-  -webkit-flex: 1;
-  flex: 1;
-}
-
-.core-flex2, [core-flex=2] {
-  -webkit-box-flex: 2;
-  -ms-flex: 2;
-  -moz-flex: 2;
-  -webkit-flex: 2;
-  flex: 2;
-}
-
-.core-flex3, [core-flex=3] {
-  -webkit-box-flex: 3;
-  -ms-flex: 3;
-  -moz-flex: 3;
-  -webkit-flex: 3;
-  flex: 3;
-}
-
-/* distributed elements */
-::content > .core-flex, ::content > [core-flex] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1;
-  -moz-flex: 1;
-  -webkit-flex: 1;
-  flex: 1;
-}
-
-::content > .core-flex-auto, ::content > [core-flex-auto] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1 1 auto;
-  -moz-flex: 1 1 auto;
-  -webkit-flex: 1 1 auto;
-  flex: 1 1 auto;
-}
-
-::content > .core-flex-none, ::content > [core-flex-none] {
-  -webkit-box-flex: none;
-  -ms-flex: none;
-  -moz-flex: none;
-  -webkit-flex: none;
-  flex: none;
-}
-
-::content > .core-flex1, ::content > [core-flex=1] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1;
-  -moz-flex: 1;
-  -webkit-flex: 1;
-  flex: 1;
-}
-
-::content > .core-flex2, ::content > [core-flex=2] {
-  -webkit-box-flex: 2;
-  -ms-flex: 2;
-  -moz-flex: 2;
-  -webkit-flex: 2;
-  flex: 2;
-}
-
-::content > .core-flex3, ::content > [core-flex=3] {
-  -webkit-box-flex: 3;
-  -ms-flex: 3;
-  -moz-flex: 3;
-  -webkit-flex: 3;
-  flex: 3;
-}
-
-/* alignment in main axis */
-.core-justify-start {
-  -webkit-box-pack: start;
-  -ms-flex-pack: start;
-  -moz-justify-content: flex-start;
-  -webkit-justify-content: flex-start;
-  justify-content: flex-start;
-}
-
-.core-justify-center {
-  -webkit-box-pack: center;
-  -ms-flex-pack: center;
-  -moz-justify-content: center;
-  -webkit-justify-content: center;
-  justify-content: center;
-}
-
-.core-justify-end {
-  -webkit-box-pack: end;
-  -ms-flex-pack: end;
-  -moz-justify-content: flex-end;
-  -webkit-justify-content: flex-end;
-  justify-content: flex-end;
-}
-
-.core-justify-between {
-  -webkit-box-pack: justify;
-  -ms-flex-pack: justify;
-  -moz-justify-content: space-between;
-  -webkit-justify-content: space-between;
-  justify-content: space-between;
-}
-
-/* alignment in cross axis */
-.core-align-start {
-  -webkit-box-align: start;
-  -ms-flex-align: start;
-  -moz-align-items: flex-start;
-  -webkit-align-items: flex-start;
-  align-items: flex-start;
-}
-
-.core-align-center {
-  -webkit-box-align: center;
-  -ms-flex-align: center;
-  -moz-align-items: center;
-  -webkit-align-items: center;
-  align-items: center;
-}
-
-.core-align-end {
-  -webkit-box-align: end;
-  -ms-flex-align: end;
-  -moz-align-items: flex-end;
-  -webkit-align-items: flex-end;
-  align-items: flex-end;
-}
-</style>
-
-  <div class="toolbar-tools-bottom core-h core-align-center">
+  <div id="bottomBar" class="toolbar-tools" center="" horizontal="" layout="">
     <content select=".bottom"></content>
   </div>
   
-  <div class="toolbar-tools-middle core-h core-align-center">
+  <div id="middleBar" class="toolbar-tools" center="" horizontal="" layout="">
     <content select=".middle"></content>
   </div>
 
-  <div class="toolbar-tools core-h core-align-center">
+  <div id="topBar" class="toolbar-tools" center="" horizontal="" layout="">
     <content></content>
   </div>
 
 </template>
-<script>
-
-  Polymer('core-toolbar', {
-
-    defaultTheme: 'core-light-theme'
-
-  });
-
-</script>
 </polymer-element>
 
 <!--
@@ -3353,39 +2987,12 @@ Example:
       <div>Content goes here...</div>
     </core-header-panel>
 
-There are six different modes of header and scrolling behaviors.
-
-`standard`: The header is a step above the panel. The header will consume the 
-panel at the point of entry, preventing it from passing through to the 
-opposite side.
-
-`seamed`: The header is presented as seamed with the panel.
-
-`waterfall`: Similar to standard mode, but header is initially presented as 
-seamed with panel, but then separates to form the step.
-
-`waterfall-tall`: The header is initially taller (`tall` class is added to 
-the header).  As the user scrolls, the header separates (forming an edge)
-while condensing (`tall` class is removed from the header).
-
-`scroll`: The header keeps its seam with the panel, and is pushed off screen.
-
-`cover`: The panel covers the whole `core-header-panel` including the
-header. This allows user to style the panel in such a way that the panel is
-partially covering the header.
- 
-    <core-header-panel mode="cover">
-      <core-appbar class="tall">
-        <core-icon-button icon="menu"></core-icon-button>
-      </core-appbar>
-      <div class="content" style="margin: 60px"></div>
-    </core-header-panel>
+Use `mode` to controls the header and scrolling behavior.
 
 @group Polymer Core Elements
 @element core-header-panel
 @homepage github.io
 -->
-
 
 
 
@@ -3401,12 +3008,21 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-.header-panel-container {
+:host {
+  display: block;
   position: relative;
+}
+
+#outerContainer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   overflow: auto;
 }
 
-.panel-container {
+#mainPanel {
   position: relative;
 }
 
@@ -3428,16 +3044,17 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   display: none;
 }
 
+/* 
+mode: scroll 
+*/
 :host([mode=scroll]) #mainContainer {
   overflow: visible;
 }
 
-/* @polyfill :host([mode=scroll]) #mainContainer > * */
-:host([mode=scroll]) ::content#mainContent > * {
-  overflow: hidden;
-}
-
-:host([mode=cover]) .panel-container {
+/*
+mode: cover
+*/
+:host([mode=cover]) #mainPanel {
   position: static;
 }
 
@@ -3448,238 +3065,24 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   bottom: 0;
   left: 0;
 }
-</style>
-  <style>/*
-Copyright 2013 The Polymer Authors. All rights reserved.
-Use of this source code is governed by a BSD-style
-license that can be found in the LICENSE file.
-*/
 
-.core-h, .core-v {
-  display: -webkit-box !important;
-  display: -ms-flexbox !important;
-  display: -moz-flex !important;
-  display: -webkit-flex !important;
-  display: flex !important;
-}
-
-.core-h {
-  -webkit-box-orient: horizontal;
-  -ms-flex-direction: row;
-  -moz-flex-direction: row;
-  -webkit-flex-direction: row;
-  flex-direction: row;
-}
-
-.core-h.core-reverse {
-  -webkit-box-direction: reverse;
-  -ms-flex-direction: row-reverse;
-  -moz-flex-direction: row-reverse;
-  -webkit-flex-direction: row-reverse;
-  flex-direction: row-reverse;
-}
-
-.core-v {
-  -webkit-box-orient: vertical;
-  -ms-flex-direction: column;
-  -moz-flex-direction: column;
-  -webkit-flex-direction: column;
-  flex-direction: column;
-}
-
-.core-v.core-reverse {
-  -webkit-box-direction: reverse;
-  -ms-flex-direction: column-reverse;
-  -moz-flex-direction: column-reverse;
-  -webkit-flex-direction: column-reverse;
-  flex-direction: column-reverse;
-}
-
-.core-relative {
-  position: relative;
-}
-
-.core-fit {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
+:host([mode=cover]) #dropShadow {
+  position: static;
   width: 100%;
 }
-
-body.core-fit {
-  margin: 0;
-}
-
-.core-flex, [core-flex] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1;
-  -moz-flex: 1;
-  -webkit-flex: 1;
-  flex: 1;
-}
-
-.core-flex-auto, [core-flex-auto] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1 1 auto;
-  -moz-flex: 1 1 auto;
-  -webkit-flex: 1 1 auto;
-  flex: 1 1 auto;
-}
-
-.core-flex-none, [core-flex-none] {
-  -webkit-box-flex: none;
-  -ms-flex: none;
-  -moz-flex: none;
-  -webkit-flex: none;
-  flex: none;
-}
-
-.core-flex1, [core-flex=1] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1;
-  -moz-flex: 1;
-  -webkit-flex: 1;
-  flex: 1;
-}
-
-.core-flex2, [core-flex=2] {
-  -webkit-box-flex: 2;
-  -ms-flex: 2;
-  -moz-flex: 2;
-  -webkit-flex: 2;
-  flex: 2;
-}
-
-.core-flex3, [core-flex=3] {
-  -webkit-box-flex: 3;
-  -ms-flex: 3;
-  -moz-flex: 3;
-  -webkit-flex: 3;
-  flex: 3;
-}
-
-/* distributed elements */
-::content > .core-flex, ::content > [core-flex] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1;
-  -moz-flex: 1;
-  -webkit-flex: 1;
-  flex: 1;
-}
-
-::content > .core-flex-auto, ::content > [core-flex-auto] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1 1 auto;
-  -moz-flex: 1 1 auto;
-  -webkit-flex: 1 1 auto;
-  flex: 1 1 auto;
-}
-
-::content > .core-flex-none, ::content > [core-flex-none] {
-  -webkit-box-flex: none;
-  -ms-flex: none;
-  -moz-flex: none;
-  -webkit-flex: none;
-  flex: none;
-}
-
-::content > .core-flex1, ::content > [core-flex=1] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1;
-  -moz-flex: 1;
-  -webkit-flex: 1;
-  flex: 1;
-}
-
-::content > .core-flex2, ::content > [core-flex=2] {
-  -webkit-box-flex: 2;
-  -ms-flex: 2;
-  -moz-flex: 2;
-  -webkit-flex: 2;
-  flex: 2;
-}
-
-::content > .core-flex3, ::content > [core-flex=3] {
-  -webkit-box-flex: 3;
-  -ms-flex: 3;
-  -moz-flex: 3;
-  -webkit-flex: 3;
-  flex: 3;
-}
-
-/* alignment in main axis */
-.core-justify-start {
-  -webkit-box-pack: start;
-  -ms-flex-pack: start;
-  -moz-justify-content: flex-start;
-  -webkit-justify-content: flex-start;
-  justify-content: flex-start;
-}
-
-.core-justify-center {
-  -webkit-box-pack: center;
-  -ms-flex-pack: center;
-  -moz-justify-content: center;
-  -webkit-justify-content: center;
-  justify-content: center;
-}
-
-.core-justify-end {
-  -webkit-box-pack: end;
-  -ms-flex-pack: end;
-  -moz-justify-content: flex-end;
-  -webkit-justify-content: flex-end;
-  justify-content: flex-end;
-}
-
-.core-justify-between {
-  -webkit-box-pack: justify;
-  -ms-flex-pack: justify;
-  -moz-justify-content: space-between;
-  -webkit-justify-content: space-between;
-  justify-content: space-between;
-}
-
-/* alignment in cross axis */
-.core-align-start {
-  -webkit-box-align: start;
-  -ms-flex-align: start;
-  -moz-align-items: flex-start;
-  -webkit-align-items: flex-start;
-  align-items: flex-start;
-}
-
-.core-align-center {
-  -webkit-box-align: center;
-  -ms-flex-align: center;
-  -moz-align-items: center;
-  -webkit-align-items: center;
-  align-items: center;
-}
-
-.core-align-end {
-  -webkit-box-align: end;
-  -ms-flex-align: end;
-  -moz-align-items: flex-end;
-  -webkit-align-items: flex-end;
-  align-items: flex-end;
-}
 </style>
   
-  <core-layout vertical=""></core-layout>
-  
-  <div class="header-panel-container core-v" core-flex="" on-scroll="{{scroll}}">
+  <div id="outerContainer" on-scroll="{{scroll}}" vertical="" layout="">
 
-    <content id="headerContent" select="core-toolbar, paper-toolbar, .core-header"></content>
+    <content id="headerContent" select="core-toolbar, .core-header"></content>
 
-    <div class="panel-container core-h" core-flex="">
+    <div id="mainPanel" flex="" vertical="" layout="">
     
-      <div id="mainContainer" core-flex?="{{mode !== &apos;cover&apos;}}" on-scroll="{{scroll}}">
+      <div id="mainContainer" flex?="{{mode !== &apos;cover&apos;}}" on-scroll="{{scroll}}">
         <content id="mainContent" select="*"></content>
       </div>
       
-      <div id="dropShadow" class="hidden"></div>
+      <div id="dropShadow"></div>
       
     </div>
 
@@ -3693,7 +3096,8 @@ body.core-fit {
     publish: {
       /**
        * Controls header and scrolling behavior. Options are
-       * `standard`, `seamed`, `waterfall`, `waterfall-tall`, `scroll` and `cover`.
+       * `standard`, `seamed`, `waterfall`, `waterfall-tall`, 
+       * `waterfall-medium-tall`, `scroll` and `cover`.
        * Default is `standard`.
        *
        * `standard`: The header is a step above the panel. The header will consume the 
@@ -3715,15 +3119,50 @@ body.core-fit {
        * header. This allows user to style the panel in such a way that the panel is
        * partially covering the header.
        *
+       *     <style>
+       *       core-header-panel[mode=cover]::shadow #mainContainer {
+       *         left: 80px;
+       *       }
+       *       .content {
+       *         margin: 60px 60px 60px 0;
+       *       }
+       *     </style>
+       * 
+       *     <core-header-panel mode="cover">
+       *       <core-appbar class="tall">
+       *         <core-icon-button icon="menu"></core-icon-button>
+       *       </core-appbar>
+       *       <div class="content"></div>
+       *     </core-header-panel>
+       *
        * @attribute mode
        * @type string
        * @default ''
        */
-      mode: {value: '', reflect: true}
+      mode: {value: '', reflect: true},
+      
+      /**
+       * The class used in waterfall-tall mode.  Change this if the header
+       * accepts a different class for toggling height, e.g. "medium-tall"
+       *
+       * @attribute tallClass
+       * @type string
+       * @default 'tall'
+       */
+      tallClass: 'tall',
+      
+      /**
+       * If true, the drop-shadow is always shown no matter what mode is set to.
+       *
+       * @attribute shadow
+       * @type boolean
+       * @default false
+       */
+      shadow: false,
     },
-
-    ready: function() {
-      this.scroll();
+    
+    domReady: function() {
+      this.async('scroll');
     },
 
     modeChanged: function() {
@@ -3733,20 +3172,24 @@ body.core-fit {
     get header() {
       return this.$.headerContent.getDistributedNodes()[0];
     },
-
+    
     scroll: function() {
-      var seamedMode = {'waterfall': 1, 'waterfall-tall': 1, 'scroll': 1};
-      var noShadow = {'seamed': 1, 'cover': 1};
+      var shadowMode = {'waterfall': 1, 'waterfall-tall': 1};
+      var noShadow = {'seamed': 1, 'cover': 1, 'scroll': 1};
       var tallMode = {'waterfall-tall': 1};
+      
       var main = this.$.mainContainer;
-      var atTop = (main.scrollTop === 0);
       var header = this.header;
+      
+      var sTop = main.scrollTop;
+      var atTop = sTop === 0;
+      
       if (header) {
-        this.$.dropShadow.classList.toggle('hidden', atTop && 
-            seamedMode[this.mode] || noShadow[this.mode]);
+        this.$.dropShadow.classList.toggle('hidden', !this.shadow &&
+            (atTop && shadowMode[this.mode] || noShadow[this.mode]));
+        
         if (tallMode[this.mode]) {
-          var d = main.scrollHeight - main.offsetHeight > header.offsetHeight;
-          header.classList.toggle('tall', !d || atTop);
+          header.classList.toggle(this.tallClass, atTop);
         }
       }
     }
@@ -5060,7 +4503,7 @@ Element wrapper for the `marked` (http://marked.org/) library.
     },
 
     textChanged: function () {
-      this.innerHTML = this.text ? marked(String(this.text)) : '';
+      this.innerHTML = marked(this.text);
     },
 
     highlight: function(code, lang) {
@@ -5451,13 +4894,15 @@ Original style from softwaremaniacs.org (c) Ivan Sagalaev <Maniac@SoftwareManiac
             
             // an entity may have these describable sub-features
             case 'attribute':
+            case 'property':
             case 'method':
             case 'event':
               subCurrent = {
                 name: content,
                 description: code
               };
-              makePragma(current, pragma + 's', subCurrent);
+              var label = pragma == 'property' ? 'properties' : pragma + 's';
+              makePragma(current, label, subCurrent);
               break;
   
             // sub-feature pragmas
@@ -5556,388 +5001,370 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 
 
 
-<polymer-element name="core-xhr" assetpath="../core-ajax/">
-<!--<template>
+<polymer-element name="core-xhr" hidden assetpath="../core-ajax/">
 
-  <style>
-    :host {
-      display: none;
-    }
-  </style>
+  <script>
 
-</template>-->
-<script>
+    Polymer('core-xhr', {
 
-  Polymer('core-xhr', {
-
-    /**
-     * Sends a HTTP request to the server and returns the XHR object.
-     *
-     * @method request
-     * @param {Object} inOptions
-     *    @param {String} inOptions.url The url to which the request is sent.
-     *    @param {String} inOptions.method The HTTP method to use, default is GET.
-     *    @param {boolean} inOptions.sync By default, all requests are sent asynchronously. To send synchronous requests, set to true.
-     *    @param {Object} inOptions.params Data to be sent to the server.
-     *    @param {Object} inOptions.body The content for the request body for POST method.
-     *    @param {Object} inOptions.headers HTTP request headers.
-     *    @param {String} inOptions.responseType The response type. Default is 'text'.
-     *    @param {boolean} inOptions.withCredentials Whether or not to send credentials on the request. Default is false.
-     *    @param {Object} inOptions.callback Called when request is completed.
-     * @returns {Object} XHR object.
-     */
-    request: function(options) {
-      var xhr = new XMLHttpRequest();
-      var url = options.url;
-      var method = options.method || 'GET';
-      var async = !options.sync;
-      //
-      var params = this.toQueryString(options.params);
-      if (params && method == 'GET') {
-        url += (url.indexOf('?') > 0 ? '&' : '?') + params;
-      }
-      var xhrParams = this.isBodyMethod(method) ? (options.body || params) : null;
-      //
-      xhr.open(method, url, async);
-      if (options.responseType) {
-        xhr.responseType = options.responseType;
-      }
-      if (options.withCredentials) {
-        xhr.withCredentials = true;
-      }
-      this.makeReadyStateHandler(xhr, options.callback);
-      this.setRequestHeaders(xhr, options.headers);
-      xhr.send(xhrParams);
-      if (!async) {
-        xhr.onreadystatechange(xhr);
-      }
-      return xhr;
-    },
-  
-    toQueryString: function(params) {
-      var r = [];
-      for (var n in params) {
-        var v = params[n];
-        n = encodeURIComponent(n);
-        r.push(v == null ? n : (n + '=' + encodeURIComponent(v)));
-      }
-      return r.join('&');
-    },
-
-    isBodyMethod: function(method) {
-      return this.bodyMethods[(method || '').toUpperCase()];
-    },
+      /**
+       * Sends a HTTP request to the server and returns the XHR object.
+       *
+       * @method request
+       * @param {Object} inOptions
+       *    @param {String} inOptions.url The url to which the request is sent.
+       *    @param {String} inOptions.method The HTTP method to use, default is GET.
+       *    @param {boolean} inOptions.sync By default, all requests are sent asynchronously. To send synchronous requests, set to true.
+       *    @param {Object} inOptions.params Data to be sent to the server.
+       *    @param {Object} inOptions.body The content for the request body for POST method.
+       *    @param {Object} inOptions.headers HTTP request headers.
+       *    @param {String} inOptions.responseType The response type. Default is 'text'.
+       *    @param {boolean} inOptions.withCredentials Whether or not to send credentials on the request. Default is false.
+       *    @param {Object} inOptions.callback Called when request is completed.
+       * @returns {Object} XHR object.
+       */
+      request: function(options) {
+        var xhr = new XMLHttpRequest();
+        var url = options.url;
+        var method = options.method || 'GET';
+        var async = !options.sync;
+        //
+        var params = this.toQueryString(options.params);
+        if (params && method == 'GET') {
+          url += (url.indexOf('?') > 0 ? '&' : '?') + params;
+        }
+        var xhrParams = this.isBodyMethod(method) ? (options.body || params) : null;
+        //
+        xhr.open(method, url, async);
+        if (options.responseType) {
+          xhr.responseType = options.responseType;
+        }
+        if (options.withCredentials) {
+          xhr.withCredentials = true;
+        }
+        this.makeReadyStateHandler(xhr, options.callback);
+        this.setRequestHeaders(xhr, options.headers);
+        xhr.send(xhrParams);
+        if (!async) {
+          xhr.onreadystatechange(xhr);
+        }
+        return xhr;
+      },
     
-    bodyMethods: {
-      POST: 1,
-      PUT: 1,
-      DELETE: 1
-    },
-
-    makeReadyStateHandler: function(xhr, callback) {
-      xhr.onreadystatechange = function() {
-        if (xhr.readyState == 4) {
-          callback && callback.call(null, xhr.response, xhr);
+      toQueryString: function(params) {
+        var r = [];
+        for (var n in params) {
+          var v = params[n];
+          n = encodeURIComponent(n);
+          r.push(v == null ? n : (n + '=' + encodeURIComponent(v)));
         }
-      };
-    },
+        return r.join('&');
+      },
 
-    setRequestHeaders: function(xhr, headers) {
-      if (headers) {
-        for (var name in headers) {
-          xhr.setRequestHeader(name, headers[name]);
+      isBodyMethod: function(method) {
+        return this.bodyMethods[(method || '').toUpperCase()];
+      },
+      
+      bodyMethods: {
+        POST: 1,
+        PUT: 1,
+        DELETE: 1
+      },
+
+      makeReadyStateHandler: function(xhr, callback) {
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState == 4) {
+            callback && callback.call(null, xhr.response, xhr);
+          }
+        };
+      },
+
+      setRequestHeaders: function(xhr, headers) {
+        if (headers) {
+          for (var name in headers) {
+            xhr.setRequestHeader(name, headers[name]);
+          }
         }
       }
-    }
 
-  });
+    });
 
-</script>  
+  </script>
+  
 </polymer-element>
 
 <polymer-element name="core-ajax" attributes="url handleAs auto params response method headers body contentType withCredentials" assetpath="../core-ajax/">
-<script>
+  <script>
 
-  Polymer('core-ajax', {
-    /**
-     * Fired when a response is received.
-     * 
-     * @event core-response
-     */
+    Polymer('core-ajax', {
+      /**
+       * Fired when a response is received.
+       * 
+       * @event core-response
+       */
+ 
+      /**
+       * Fired when an error is received.
+       * 
+       * @event core-error
+       */
+ 
+      /**
+       * Fired whenever a response or an error is received.
+       *
+       * @event core-complete
+       */
 
-    /**
-     * Fired when an error is received.
-     * 
-     * @event core-error
-     */
+      /**
+       * The URL target of the request.
+       * 
+       * @attribute url
+       * @type string
+       * @default ''
+       */
+      url: '',
 
-    /**
-     * Fired whenever a response or an error is received.
-     *
-     * @event core-complete
-     */
+      /**
+       * Specifies what data to store in the `response` property, and
+       * to deliver as `event.response` in `response` events.
+       * 
+       * One of:
+       * 
+       *    `text`: uses `XHR.responseText`.
+       *    
+       *    `xml`: uses `XHR.responseXML`.
+       *    
+       *    `json`: uses `XHR.responseText` parsed as JSON.
+       *
+       *    `arraybuffer`: uses `XHR.response`.
+       *
+       *    `blob`: uses `XHR.response`.
+       *
+       *    `document`: uses `XHR.response`.
+       *  
+       * @attribute handleAs
+       * @type string
+       * @default 'text'
+       */
+      handleAs: '',
 
-    /**
-     * The URL target of the request.
-     * 
-     * @attribute url
-     * @type string
-     * @default ''
-     */
-    url: '',
+      /**
+       * If true, automatically performs an Ajax request when either `url` or `params` changes.
+       *
+       * @attribute auto
+       * @type boolean
+       * @default false
+       */
+      auto: false,
 
-    /**
-     * Specifies what data to store in the `response` property, and
-     * to deliver as `event.response` in `response` events.
-     * 
-     * One of:
-     * 
-     *    `text`: uses `XHR.responseText`.
-     *    
-     *    `xml`: uses `XHR.responseXML`.
-     *    
-     *    `json`: uses `XHR.responseText` parsed as JSON.
-     *
-     *    `arraybuffer`: uses `XHR.response`.
-     *
-     *    `blob`: uses `XHR.response`.
-     *
-     *    `document`: uses `XHR.response`.
-     *  
-     * @attribute handleAs
-     * @type string
-     * @default 'text'
-     */
-    handleAs: '',
+      /**
+       * Parameters to send to the specified URL, as JSON.
+       *  
+       * @attribute params
+       * @type string (JSON)
+       * @default ''
+       */
+      params: '',
 
-    /**
-     * If true, automatically performs an Ajax request when either `url` or `params` changes.
-     *
-     * @attribute auto
-     * @type boolean
-     * @default false
-     */
-    auto: false,
+      /**
+       * Returns the response object.
+       *
+       * @attribute response
+       * @type Object
+       * @default null
+       */
+      response: null,
 
-    /**
-     * Parameters to send to the specified URL, as JSON.
-     *  
-     * @attribute params
-     * @type string (JSON)
-     * @default ''
-     */
-    params: '',
+      /**
+       * The HTTP method to use such as 'GET', 'POST', 'PUT', or 'DELETE'.
+       * Default is 'GET'.
+       *
+       * @attribute method
+       * @type string
+       * @default ''
+       */
+      method: '',
 
-    /**
-     * Returns the response object.
-     *
-     * @attribute response
-     * @type Object
-     * @default null
-     */
-    response: null,
+      /**
+       * HTTP request headers to send.
+       *
+       * Example:
+       *
+       *     <core-ajax 
+       *         auto
+       *         url="http://somesite.com"
+       *         headers='{"X-Requested-With": "XMLHttpRequest"}'
+       *         handleAs="json"
+       *         on-core-response="{{handleResponse}}"></core-ajax>
+       *  
+       * @attribute headers
+       * @type Object
+       * @default null
+       */
+      headers: null,
 
-    /**
-     * The HTTP method to use such as 'GET', 'POST', 'PUT', or 'DELETE'.
-     * Default is 'GET'.
-     *
-     * @attribute method
-     * @type string
-     * @default ''
-     */
-    method: '',
+      /**
+       * Optional raw body content to send when method === "POST".
+       *
+       * Example:
+       *
+       *     <core-ajax method="POST" auto url="http://somesite.com"
+       *         body='{"foo":1, "bar":2}'>
+       *     </core-ajax>
+       *  
+       * @attribute body
+       * @type Object
+       * @default null
+       */
+      body: null,
 
-    /**
-     * HTTP request headers to send.
-     *
-     * Example:
-     *
-     *     <core-ajax 
-     *         auto
-     *         url="http://somesite.com"
-     *         headers='{"X-Requested-With": "XMLHttpRequest"}'
-     *         handleAs="json"
-     *         on-core-response="{{handleResponse}}"></core-ajax>
-     *  
-     * @attribute headers
-     * @type Object
-     * @default null
-     */
-    headers: null,
+      /**
+       * Content type to use when sending data.
+       *
+       * @attribute contentType
+       * @type string
+       * @default 'application/x-www-form-urlencoded'
+       */
+      contentType: 'application/x-www-form-urlencoded',
 
-    /**
-     * Optional raw body content to send when method === "POST".
-     *
-     * Example:
-     *
-     *     <core-ajax method="POST" auto url="http://somesite.com"
-     *         body='{"foo":1, "bar":2}'>
-     *     </core-ajax>
-     *  
-     * @attribute body
-     * @type Object
-     * @default null
-     */
-    body: null,
+      /**
+       * Set the withCredentials flag on the request.
+       * 
+       * @attribute withCredentials
+       * @type boolean
+       * @default false
+       */
+      withCredentials: false,
+      
+      ready: function() {
+        this.xhr = document.createElement('core-xhr');
+      },
 
-    /**
-     * Content type to use when sending data.
-     *
-     * @attribute contentType
-     * @type string
-     * @default 'application/x-www-form-urlencoded'
-     */
-    contentType: 'application/x-www-form-urlencoded',
-
-    /**
-     * Set the withCredentials flag on the request.
-     * 
-     * @attribute withCredentials
-     * @type boolean
-     * @default false
-     */
-    withCredentials: false,
-    
-    ready: function() {
-      this.xhr = document.createElement('core-xhr');
-    },
-
-    receive: function(response, xhr) {
-      if (this.isSuccess(xhr)) {
-        this.processResponse(xhr);
-      } else {
-        this.error(xhr);
-      }
-      this.complete(xhr);
-    },
-
-    isSuccess: function(xhr) {
-      var status = xhr.status || 0;
-      return !status || (status >= 200 && status < 300);
-    },
-
-    processResponse: function(xhr) {
-      var response = this.evalResponse(xhr);
-      this.response = response;
-      this.fire('core-response', {response: response, xhr: xhr});
-    },
-
-    error: function(xhr) {
-      var response = xhr.status + ': ' + xhr.responseText;
-      this.fire('core-error', {response: response, xhr: xhr});
-    },
-
-    complete: function(xhr) {
-      this.request = null;
-      this.fire('core-complete', {response: xhr.status, xhr: xhr});
-    },
-
-    evalResponse: function(xhr) {
-      return this[(this.handleAs || 'text') + 'Handler'](xhr);
-    },
-
-    xmlHandler: function(xhr) {
-      return xhr.responseXML;
-    },
-
-    textHandler: function(xhr) {
-      return xhr.responseText;
-    },
-
-    jsonHandler: function(xhr) {
-      var r = xhr.responseText;
-      try {
-        return JSON.parse(r);
-      } catch (x) {
-        return r;
-      }
-    },
-
-    documentHandler: function(xhr) {
-      return xhr.response;
-    },
-
-    blobHandler: function(xhr) {
-      return xhr.response;
-    },
-
-    arraybufferHandler: function(xhr) {
-      return xhr.response;
-    },
-
-    urlChanged: function() {
-      if (!this.handleAs) {
-        var ext = String(this.url).split('.').pop();
-        switch (ext) {
-          case 'json':
-            this.handleAs = 'json';
-            break;
+      receive: function(response, xhr) {
+        if (this.isSuccess(xhr)) {
+          this.processResponse(xhr);
+        } else {
+          this.error(xhr);
         }
-      }
-      this.autoGo();
-    },
+        this.complete(xhr);
+      },
 
-    paramsChanged: function() {
-      this.autoGo();
-    },
+      isSuccess: function(xhr) {
+        var status = xhr.status || 0;
+        return !status || (status >= 200 && status < 300);
+      },
 
-    autoChanged: function() {
-      this.autoGo();
-    },
+      processResponse: function(xhr) {
+        var response = this.evalResponse(xhr);
+        this.response = response;
+        this.fire('core-response', {response: response, xhr: xhr});
+      },
 
-    // TODO(sorvell): multiple side-effects could call autoGo 
-    // during one micro-task, use a job to have only one action 
-    // occur
-    autoGo: function() {
-      if (this.auto) {
-        this.abort();
-        this.goJob = this.job(this.goJob, this.go, 0);
-      }
-    },
+      error: function(xhr) {
+        var response = xhr.status + ': ' + xhr.responseText;
+        this.fire('core-error', {response: response, xhr: xhr});
+      },
 
-    /**
-     * Performs an Ajax request to the specified URL.
-     *
-     * @method go
-     */
-    go: function() {
-      var args = this.xhrArgs || {};
-      // TODO(sjmiles): we may want XHR to default to POST if body is set
-      args.body = this.body || args.body;
-      args.params = this.params || args.params;
-      if (args.params && typeof(args.params) == 'string') {
-        args.params = JSON.parse(args.params);
-      }
-      args.headers = this.headers || args.headers || {};
-      if (args.headers && typeof(args.headers) == 'string') {
-        args.headers = JSON.parse(args.headers);
-      }
-      if (this.contentType) {
-        args.headers['content-type'] = this.contentType;
-      }
-      if (this.handleAs === 'arraybuffer' || this.handleAs === 'blob' ||
-          this.handleAs === 'document') {
-        args.responseType = this.handleAs;
-      }
-      args.withCredentials = this.withCredentials;
-      args.callback = this.receive.bind(this);
-      args.url = this.url;
-      args.method = this.method;
-      //
-      this.request = args.url && this.xhr.request(args);
-      return this.request;
-    },
-    
-    abort: function() {
-      if (this.request) {
-        this.request.abort();
-        this.request = null;
-      }
-    }
+      complete: function(xhr) {
+        this.fire('core-complete', {response: xhr.status, xhr: xhr});
+      },
 
-  });
+      evalResponse: function(xhr) {
+        return this[(this.handleAs || 'text') + 'Handler'](xhr);
+      },
 
-</script>
+      xmlHandler: function(xhr) {
+        return xhr.responseXML;
+      },
+
+      textHandler: function(xhr) {
+        return xhr.responseText;
+      },
+
+      jsonHandler: function(xhr) {
+        var r = xhr.responseText;
+        try {
+          return JSON.parse(r);
+        } catch (x) {
+          return r;
+        }
+      },
+
+      documentHandler: function(xhr) {
+        return xhr.response;
+      },
+
+      blobHandler: function(xhr) {
+        return xhr.response;
+      },
+
+      arraybufferHandler: function(xhr) {
+        return xhr.response;
+      },
+
+      urlChanged: function() {
+        if (!this.handleAs) {
+          var ext = String(this.url).split('.').pop();
+          switch (ext) {
+            case 'json':
+              this.handleAs = 'json';
+              break;
+          }
+        }
+        this.autoGo();
+      },
+
+      paramsChanged: function() {
+        this.autoGo();
+      },
+
+      autoChanged: function() {
+        this.autoGo();
+      },
+
+      // TODO(sorvell): multiple side-effects could call autoGo 
+      // during one micro-task, use a job to have only one action 
+      // occur
+      autoGo: function() {
+        if (this.auto) {
+          this.goJob = this.job(this.goJob, this.go, 0);
+        }
+      },
+
+      /**
+       * Performs an Ajax request to the specified URL.
+       *
+       * @method go
+       */
+      go: function() {
+        var args = this.xhrArgs || {};
+        // TODO(sjmiles): we may want XHR to default to POST if body is set
+        args.body = this.body || args.body;
+        args.params = this.params || args.params;
+        if (args.params && typeof(args.params) == 'string') {
+          args.params = JSON.parse(args.params);
+        }
+        args.headers = this.headers || args.headers || {};
+        if (args.headers && typeof(args.headers) == 'string') {
+          args.headers = JSON.parse(args.headers);
+        }
+        if (this.contentType) {
+          args.headers['content-type'] = this.contentType;
+        }
+        if (this.handleAs === 'arraybuffer' || this.handleAs === 'blob' ||
+            this.handleAs === 'document') {
+          args.responseType = this.handleAs;
+        }
+        args.withCredentials = this.withCredentials;
+        args.callback = this.receive.bind(this);
+        args.url = this.url;
+        args.method = this.method;
+        return args.url && this.xhr.request(args);
+      }
+
+    });
+
+  </script>
 </polymer-element>
 
 
@@ -6531,62 +5958,62 @@ The complete set of contributors may be found at http://polymer.github.io/CONTRI
 Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 -->
+
 <!--
-/**
- * @group Polymer Core Elements
- */
-/**
- * core-selector is used to manage a list of elements that can be selected.
- * The attribute "selected" indicates which item element is being selected.
- * The attribute "multi" indicates if multiple items can be selected at once.
- * Tapping on the item element would fire "core-activate" event. Use
- * "core-select" event to listen for selection changes.
- *
- * Example:
- *
- *     <core-selector selected="0">
- *       <div>Item 1</div>
- *       <div>Item 2</div>
- *       <div>Item 3</div>
- *     </core-selector>
- *
- * core-selector is not styled.  So one needs to use "core-selected" CSS
- * class to style the selected element.
- * 
- *     <style>
- *       .item.core-selected {
- *         background: #eee;
- *       }
- *     </style>
- *     ...
- *     <core-selector>
- *       <div class="item">Item 1</div>
- *       <div class="item">Item 2</div>
- *       <div class="item">Item 3</div>
- *     </core-selector>
- *
- * @element core-selector
- * @status stable
- * @homepage github.io
- */
-/**
- * Fired when an item's selection state is changed. This event is fired both
- * when an item is selected or deselected. The `isSelected` detail property
- * contains the selection state.
- * 
- * @event core-select
- * @param {Object} detail
- *   @param {boolean} detail.isSelected true for selection and false for deselection
- *   @param {Object} detail.item the item element
- */
-/**
- * Fired when an item element is tapped.
- * 
- * @event core-activate
- * @param {Object} detail
- *   @param {Object} detail.item the item element
- */
+@group Polymer Core Elements
+
+`<core-selector>` is used to manage a list of elements that can be selected.
+
+The attribute `selected` indicates which item element is being selected.
+The attribute `multi` indicates if multiple items can be selected at once.
+Tapping on the item element would fire `core-activate` event. Use
+`core-select` event to listen for selection changes.
+
+Example:
+
+    <core-selector selected="0">
+      <div>Item 1</div>
+      <div>Item 2</div>
+      <div>Item 3</div>
+    </core-selector>
+
+`<core-selector>` is not styled. Use the `core-selected` CSS class to style the selected element.
+
+    <style>
+      .item.core-selected {
+        background: #eee;
+      }
+    </style>
+    ...
+    <core-selector>
+      <div class="item">Item 1</div>
+      <div class="item">Item 2</div>
+      <div class="item">Item 3</div>
+    </core-selector>
+
+@element core-selector
+@status stable
+@homepage github.io
 -->
+
+<!--
+Fired when an item's selection state is changed. This event is fired both
+when an item is selected or deselected. The `isSelected` detail property
+contains the selection state.
+
+@event core-select
+@param {Object} detail
+  @param {boolean} detail.isSelected true for selection and false for deselection
+  @param {Object} detail.item the item element
+-->
+<!--
+Fired when an item element is tapped.
+
+@event core-activate
+@param {Object} detail
+  @param {Object} detail.item the item element
+-->
+
 
 <!--
 Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
@@ -6597,76 +6024,72 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 -->
 <!--
-/**
- * @group Polymer Core Elements
- *
- * The core-selection element is used to manage selection state. It has no
- * visual appearance and is typically used in conjuneciton with another element.
- * For example, <a href="core-selector.html">core-selector</a>
- * use a core-selection to manage selection.
- *
- * To mark an item as selected, call the select(item) method on 
- * core-selection. Notice that the item itself is an argument to this method.
- * The core-selection element manages selection state for any given set of
- * items. When an item is selected, the `core-select` event is fired.
- * The attribute "multi" indicates if multiple items can be selected at once.
- * 
- * Example:
- *
- *     <core-element name="selection-example">
- *        <template>
- *          <style>
- *            ::-webkit-distributed(> .selected) {
- *              font-weight: bold;
- *              font-style: italic;
- *            }
- *          </style>
- *          <ul on-tap="{{itemTapAction}}">
- *            <content></content>
- *          </ul>
- *          <core-selection id="selection" multi on-core-select="{{selectAction}}"></core-selection>
- *        </template>
- *        <script>
- *          Polymer('selection-example', {
- *            itemTapAction: function(e) {
- *              this.$.selection.select(e.target);
- *            },
- *            selectAction: function(e, detail) {
- *              detail.item.classList.toggle('selected', detail.isSelected);
- *            }
- *          });
- *        </script>
- *     </core-element>
- *
- *     <selection-example>
- *       <li>Red</li>
- *       <li>Green</li>
- *       <li>Blue</li>
- *     </selection-example>
- *
- * @element core-selection
- */
- /**
- * Fired when an item's selection state is changed. This event is fired both
- * when an item is selected or deselected. The `isSelected` detail property
- * contains the selection state.
- * 
- * @event core-select
- * @param {Object} detail
- *   @param {boolean} detail.isSelected true for selection and false for deselection
- *   @param {Object} detail.item the item element
- */
+@group Polymer Core Elements
+
+The `<core-selection>` element is used to manage selection state. It has no
+visual appearance and is typically used in conjunction with another element.
+For example, [core-selector](../core-selector)
+use a `<core-selection>` to manage selection.
+
+To mark an item as selected, call the `select(item)` method on 
+`<core-selection>`. The item itself is an argument to this method.
+
+The `<core-selection>`element manages selection state for any given set of
+items. When an item is selected, the `core-select` event is fired.
+
+The attribute `multi` indicates if multiple items can be selected at once.
+  
+Example:
+ 
+    <polymer-element name="selection-example">
+       <template>
+         <style>
+           polyfill-next-selector { content: ':host > .selected'; }
+           ::content > .selected {
+             font-weight: bold;
+             font-style: italic;
+           }
+         </style>
+         <ul on-tap="{{itemTapAction}}">
+           <content></content>
+         </ul>
+         <core-selection id="selection" multi
+                         on-core-select="{{selectAction}}"></core-selection>
+       </template>
+       <script>
+         Polymer('selection-example', {
+           itemTapAction: function(e, detail, sender) {
+             this.$.selection.select(e.target);
+           },
+           selectAction: function(e, detail, sender) {
+             detail.item.classList.toggle('selected', detail.isSelected);
+           }
+         });
+       </script>
+    </polymer-element>
+
+    <selection-example>
+      <li>Red</li>
+      <li>Green</li>
+      <li>Blue</li>
+    </selection-example>
+ 
+@element core-selection
+-->
+
+<!--
+Fired when an item's selection state is changed. This event is fired both
+when an item is selected or deselected. The `isSelected` detail property
+contains the selection state.
+
+@event core-select
+@param {Object} detail
+  @param {boolean} detail.isSelected true for selection and false for de-selection
+  @param {Object} detail.item the item element
 -->
 
 
-<polymer-element name="core-selection" attributes="multi" assetpath="../core-selection/">
-  <template>
-    <style>
-      :host {
-        display: none !important;
-      }
-    </style>
-  </template>
+<polymer-element name="core-selection" attributes="multi" hidden assetpath="../core-selection/">
   <script>
     Polymer('core-selection', {
       /**
@@ -7101,10 +6524,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
 </polymer-element>
 
 
-<polymer-element name="core-menu" extends="core-selector" noscript="" assetpath="../core-menu/">
-<template>
-
-  <style>/*
+<style shim-shadowdom="">/*
 Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
 This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
 The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
@@ -7113,16 +6533,17 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-:host {
+html /deep/ core-menu {
   display: block;
   margin: 12px;
 }
-</style>
-  
-  <shadow></shadow>
 
-</template>
-</polymer-element>
+html /deep/ core-menu > core-item {
+  cursor: default;
+}
+</style>
+
+<polymer-element name="core-menu" extends="core-selector" noscript="" assetpath="../core-menu/"></polymer-element>
 
 <!--
 Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
@@ -7154,11 +6575,7 @@ Example:
 
 
 
-
-<polymer-element name="core-item" extends="core-theme-aware" attributes="label icon src href" assetpath="../core-item/">
-<template>
-
-  <style>/*
+<style shim-shadowdom="">/*
 Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
 This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
 The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
@@ -7167,36 +6584,22 @@ Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
 */
 
-:host {
+html /deep/ core-item {
   display: block;
+  position: relative;
   height: 40px;
   white-space: nowrap;
-  cursor: pointer;
 }
 
-:host(.core-dark-theme) {
-  color: #eee;
-}
-
-:host(.core-selected) {
+html /deep/ core-item.core-selected {
   font-weight: bold;
 }
 
-.item-container {
-  position: relative;
-  height: 100%;
+html /deep/ core-item::shadow core-icon {
+  margin: 0 16px 0 4px;
 }
 
-.item-container > core-icon {
-  margin: 0 8px 0 4px;
-}
-
-#label {
-  margin-left: 8px;
-}
-
-/*@polyfill :host #label > a, #link */
-::content > a, #link {
+html /deep/ core-item::shadow ::content > a {
   position: absolute;
   top: 0;
   right: 0;
@@ -7204,238 +6607,12 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   left: 0;
 }
 </style>
-  <style>/*
-Copyright 2013 The Polymer Authors. All rights reserved.
-Use of this source code is governed by a BSD-style
-license that can be found in the LICENSE file.
-*/
 
-.core-h, .core-v {
-  display: -webkit-box !important;
-  display: -ms-flexbox !important;
-  display: -moz-flex !important;
-  display: -webkit-flex !important;
-  display: flex !important;
-}
+<polymer-element name="core-item" attributes="label icon src" horizontal="" center="" layout="" assetpath="../core-item/">
+<template>
 
-.core-h {
-  -webkit-box-orient: horizontal;
-  -ms-flex-direction: row;
-  -moz-flex-direction: row;
-  -webkit-flex-direction: row;
-  flex-direction: row;
-}
-
-.core-h.core-reverse {
-  -webkit-box-direction: reverse;
-  -ms-flex-direction: row-reverse;
-  -moz-flex-direction: row-reverse;
-  -webkit-flex-direction: row-reverse;
-  flex-direction: row-reverse;
-}
-
-.core-v {
-  -webkit-box-orient: vertical;
-  -ms-flex-direction: column;
-  -moz-flex-direction: column;
-  -webkit-flex-direction: column;
-  flex-direction: column;
-}
-
-.core-v.core-reverse {
-  -webkit-box-direction: reverse;
-  -ms-flex-direction: column-reverse;
-  -moz-flex-direction: column-reverse;
-  -webkit-flex-direction: column-reverse;
-  flex-direction: column-reverse;
-}
-
-.core-relative {
-  position: relative;
-}
-
-.core-fit {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  width: 100%;
-}
-
-body.core-fit {
-  margin: 0;
-}
-
-.core-flex, [core-flex] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1;
-  -moz-flex: 1;
-  -webkit-flex: 1;
-  flex: 1;
-}
-
-.core-flex-auto, [core-flex-auto] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1 1 auto;
-  -moz-flex: 1 1 auto;
-  -webkit-flex: 1 1 auto;
-  flex: 1 1 auto;
-}
-
-.core-flex-none, [core-flex-none] {
-  -webkit-box-flex: none;
-  -ms-flex: none;
-  -moz-flex: none;
-  -webkit-flex: none;
-  flex: none;
-}
-
-.core-flex1, [core-flex=1] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1;
-  -moz-flex: 1;
-  -webkit-flex: 1;
-  flex: 1;
-}
-
-.core-flex2, [core-flex=2] {
-  -webkit-box-flex: 2;
-  -ms-flex: 2;
-  -moz-flex: 2;
-  -webkit-flex: 2;
-  flex: 2;
-}
-
-.core-flex3, [core-flex=3] {
-  -webkit-box-flex: 3;
-  -ms-flex: 3;
-  -moz-flex: 3;
-  -webkit-flex: 3;
-  flex: 3;
-}
-
-/* distributed elements */
-::content > .core-flex, ::content > [core-flex] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1;
-  -moz-flex: 1;
-  -webkit-flex: 1;
-  flex: 1;
-}
-
-::content > .core-flex-auto, ::content > [core-flex-auto] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1 1 auto;
-  -moz-flex: 1 1 auto;
-  -webkit-flex: 1 1 auto;
-  flex: 1 1 auto;
-}
-
-::content > .core-flex-none, ::content > [core-flex-none] {
-  -webkit-box-flex: none;
-  -ms-flex: none;
-  -moz-flex: none;
-  -webkit-flex: none;
-  flex: none;
-}
-
-::content > .core-flex1, ::content > [core-flex=1] {
-  -webkit-box-flex: 1;
-  -ms-flex: 1;
-  -moz-flex: 1;
-  -webkit-flex: 1;
-  flex: 1;
-}
-
-::content > .core-flex2, ::content > [core-flex=2] {
-  -webkit-box-flex: 2;
-  -ms-flex: 2;
-  -moz-flex: 2;
-  -webkit-flex: 2;
-  flex: 2;
-}
-
-::content > .core-flex3, ::content > [core-flex=3] {
-  -webkit-box-flex: 3;
-  -ms-flex: 3;
-  -moz-flex: 3;
-  -webkit-flex: 3;
-  flex: 3;
-}
-
-/* alignment in main axis */
-.core-justify-start {
-  -webkit-box-pack: start;
-  -ms-flex-pack: start;
-  -moz-justify-content: flex-start;
-  -webkit-justify-content: flex-start;
-  justify-content: flex-start;
-}
-
-.core-justify-center {
-  -webkit-box-pack: center;
-  -ms-flex-pack: center;
-  -moz-justify-content: center;
-  -webkit-justify-content: center;
-  justify-content: center;
-}
-
-.core-justify-end {
-  -webkit-box-pack: end;
-  -ms-flex-pack: end;
-  -moz-justify-content: flex-end;
-  -webkit-justify-content: flex-end;
-  justify-content: flex-end;
-}
-
-.core-justify-between {
-  -webkit-box-pack: justify;
-  -ms-flex-pack: justify;
-  -moz-justify-content: space-between;
-  -webkit-justify-content: space-between;
-  justify-content: space-between;
-}
-
-/* alignment in cross axis */
-.core-align-start {
-  -webkit-box-align: start;
-  -ms-flex-align: start;
-  -moz-align-items: flex-start;
-  -webkit-align-items: flex-start;
-  align-items: flex-start;
-}
-
-.core-align-center {
-  -webkit-box-align: center;
-  -ms-flex-align: center;
-  -moz-align-items: center;
-  -webkit-align-items: center;
-  align-items: center;
-}
-
-.core-align-end {
-  -webkit-box-align: end;
-  -ms-flex-align: end;
-  -moz-align-items: flex-end;
-  -webkit-align-items: flex-end;
-  align-items: flex-end;
-}
-</style>
+  <core-icon src="{{src}}" icon="{{icon}}" hidden?="{{!src &amp;&amp; !icon}}"></core-icon>{{label}}<content></content>
   
-  <div class="item-container core-h core-align-center">
-  
-    <template if="{{icon || src}}">
-      <core-icon src="{{src}}" icon="{{icon}}"></core-icon>
-    </template>
-    
-    <span id="label" core-flex="" class="core-h core-align-center">{{label}}<content></content></span>
-    
-    <template if="{{href}}">
-      <a id="link" href="{{href}}"></a>
-    </template>
-    
-  </div>
-
 </template>
 <script>
 
